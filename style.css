@@ -9712,6 +9712,16 @@ body *:not(.about__copy .rich-copy, .about__copy .rich-copy *) {
   hyphens: manual !important;
 }
 
+/* Bez text-wrap: pretty w justowanych akapitach O nas i pakietow.
+   Ten tryb przestawia slowa w ostatnich liniach akapitu, zeby ostatnia
+   nie byla krotka — przy justowaniu zostawial przez to bardzo luzne linie
+   (zmierzone: 37 px odstepu przed "spotkania", choc "spo-" sie miescilo).
+   Samotne slowo na koncu blokuje juz skrypt (sklejenie 2 ostatnich slow). */
+.about__copy .rich-copy p,
+.packages .package-card__body > p {
+  text-wrap: wrap !important;
+}
+
 /* 4c. TELEFON — pakiety na stronie glownej: nazwa pakietu obok cyfry
    rzymskiej, w lewym gornym rogu kafla (wczesniej nazwa byla pod cyfra,
    a kafel mial sztywne 250 px wysokosci naglowka). */

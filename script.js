@@ -1110,21 +1110,25 @@ window.dzielenieWyrazowPL?.(".about__copy .rich-copy p");
    kolumna rozpychala odstepy (uwaga 16.11: "jak      najlepiej"). */
 window.dzielenieWyrazowPL?.(".packages .package-card__body > p");
 
-/* O NAS — najwyzej 2 przeniesienia wyrazow na akapit (uwaga Oliwii 16.11:
-   "tekst jest zbyt pociety pauzami, dwie na akapit moga sie pojawic")
-   i bez dzielenia dwoch ostatnich slow akapitu (przez to na koncu
-   zostawal samotny kawalek wyrazu).
+/* O NAS i PAKIETY — najwyzej 2 przeniesienia wyrazow na akapit (uwaga Oliwii
+   16.11: "tekst jest zbyt pociety pauzami, dwie na akapit moga sie pojawic"),
+   bez dzielenia dwoch ostatnich slow akapitu (na koncu zostawal samotny
+   kawalek wyrazu) — i przy tym jak najmniejsze dziury miedzy slowami.
 
-   Przegladarka sama wybiera, w ktorym miekkim laczniku przelamac wiersz,
-   i nie da sie jej podac limitu. Dlatego po ulozeniu tekstu sprawdzamy,
-   ktore slowa faktycznie sie przelamaly (slowo zajmuje 2 wiersze), i jesli
-   w akapicie jest ich wiecej niz 2, zabieramy nadmiarowym slowom mozliwosc
-   dzielenia i ukladamy jeszcze raz. Przy zmianie szerokosci zaczynamy od
-   pelnego dzielenia (zapamietany tekst), bo inna szerokosc = inne lamanie. */
+   Przegladarka sama wybiera, gdzie przelamac wiersz, i nie zna limitu.
+   Pierwsza wersja zostawiala po prostu 2 PIERWSZE przeniesienia w akapicie;
+   pomiar na podgladzie pokazal dziury do 128 px (normalna spacja 4,7 px),
+   bo przeniesienia "zuzywaly sie" tam, gdzie nie byly potrzebne.
+
+   Teraz odwrotnie: zaczynamy od tekstu BEZ dzielenia i w kazdej rundzie
+   sprawdzamy kazde slowo, ktore da sie podzielic — zostaje to, ktore
+   najbardziej zmniejsza najwieksza dziure w akapicie. Najwyzej 2
+   przeniesienia na akapit (opisy pakietow: 4, patrz limitPrzeniesien). Przy zmianie szerokosci liczymy od
+   nowa, bo inna szerokosc = inne lamanie. */
 const MIEKKI_LACZNIK = "­";
 const MAKS_PRZENIESIEN = 2;
-const akapityONas = [...document.querySelectorAll(".about__copy .rich-copy p, .packages .package-card__body > p")];
-const pelneDzielenie = new WeakMap();
+const akapityDoDzielenia = [...document.querySelectorAll(".about__copy .rich-copy p, .packages .package-card__body > p")];
+const oryginalyAkapitow = new WeakMap();
 
 const tekstoweWezly = element => {
   const chodzik = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
@@ -1133,60 +1137,167 @@ const tekstoweWezly = element => {
   return wezly;
 };
 
-/* Slowa z miekkim lacznikiem: [wezel, poczatek, koniec]. */
-const slowaZLacznikiem = akapit => {
-  const wynik = [];
-  tekstoweWezly(akapit).forEach(wezel => {
-    const re = /[^\s ]*­[^\s ]*/g;
+/* Tekst z pelnym dzieleniem; jesli akapit przy wczytaniu nie byl justowany
+   (np. strona otwarta w waskim oknie), dzielimy go teraz. */
+const przygotujAkapit = akapit => {
+  const wezly = tekstoweWezly(akapit);
+  const zapis = oryginalyAkapitow.get(akapit);
+  if (zapis) wezly.forEach((w, i) => { if (zapis[i] != null) w.nodeValue = zapis[i]; });
+  const justowany = getComputedStyle(akapit).textAlign === "justify";
+  if (justowany && !akapit.textContent.includes(MIEKKI_LACZNIK) && window.dzielenieWyrazowPL) {
+    akapit.dataset.dzielTeraz = "";
+    window.dzielenieWyrazowPL("[data-dziel-teraz]");
+    delete akapit.dataset.dzielTeraz;
+  }
+  oryginalyAkapitow.set(akapit, tekstoweWezly(akapit).map(w => w.nodeValue));
+  return justowany;
+};
+
+/* Lista slow: wezel, pozycja i tekst z lacznikami (z oryginalu). */
+const slowaAkapitu = akapit => {
+  const zapis = oryginalyAkapitow.get(akapit);
+  const slowa = [];
+  tekstoweWezly(akapit).forEach((wezel, w) => {
+    const re = /[^\s ]+/g;
     let m;
-    while ((m = re.exec(wezel.nodeValue))) wynik.push([wezel, m.index, m.index + m[0].length]);
+    while ((m = re.exec(zapis[w]))) slowa.push({ w, od: m.index, tekst: m[0], dzieli: m[0].includes(MIEKKI_LACZNIK) });
   });
-  return wynik;
+  return slowa;
 };
 
-const slowoPrzelamane = ([wezel, od, doZnaku]) => {
-  const zakres = document.createRange();
-  zakres.setStart(wezel, od);
-  zakres.setEnd(wezel, doZnaku);
-  const gory = new Set([...zakres.getClientRects()].filter(r => r.width > 0).map(r => Math.round(r.top)));
-  return gory.size > 1;
+/* Zapisz tekst, w ktorym laczniki maja tylko slowa z zestawu "wolno". */
+const ulozAkapit = (akapit, slowa, wolno) => {
+  const zapis = oryginalyAkapitow.get(akapit);
+  const wezly = tekstoweWezly(akapit);
+  wezly.forEach((wezel, w) => {
+    let tekst = "";
+    let poz = 0;
+    slowa.forEach((s, i) => {
+      if (s.w !== w) return;
+      tekst += zapis[w].slice(poz, s.od);
+      tekst += wolno.has(i) ? s.tekst : s.tekst.split(MIEKKI_LACZNIK).join("");
+      poz = s.od + s.tekst.length;
+    });
+    tekst += zapis[w].slice(poz);
+    if (wezel.nodeValue !== tekst) wezel.nodeValue = tekst;
+  });
 };
 
-const bezLacznika = ([wezel, od, doZnaku]) => {
-  const t = wezel.nodeValue;
-  wezel.nodeValue = t.slice(0, od) + t.slice(od, doZnaku).split(MIEKKI_LACZNIK).join("") + t.slice(doZnaku);
+/* Pomiar: dla kazdego slowa pierwszy i ostatni prostokat oraz linie. */
+const zmierzAkapit = akapit => {
+  const wezly = tekstoweWezly(akapit);
+  /* Slowa mierzymy w aktualnym tekscie, kolejno — ta sama kolejnosc
+     i liczba slow co w slowaAkapitu (laczniki nie zmieniaja podzialu). */
+  const wynik = [];
+  wezly.forEach(wezel => {
+    const re = /[^\s ]+/g;
+    let m;
+    while ((m = re.exec(wezel.nodeValue))) {
+      const zakres = document.createRange();
+      zakres.setStart(wezel, m.index);
+      zakres.setEnd(wezel, m.index + m[0].length);
+      const r = [...zakres.getClientRects()].filter(x => x.width > 0);
+      if (!r.length) { wynik.push(null); continue; }
+      wynik.push({ pierwszy: r[0], ostatni: r[r.length - 1], przelamane: new Set(r.map(x => Math.round(x.top))).size > 1 });
+    }
+  });
+  /* Linie: kazda konczy sie tam, gdzie zaczyna sie nastepna. Ostatnia linia
+     akapitu nie trafia na liste — nie jest justowana, wiec jej odstepy
+     sa zawsze normalne. */
+  const opisLinii = [];
+  let start = 0;
+  for (let i = 1; i < wynik.length; i += 1) {
+    const a = wynik[i - 1];
+    const b = wynik[i];
+    if (a && b && Math.round(a.ostatni.top) !== Math.round(b.pierwszy.top)) {
+      opisLinii.push({ od: start, nastepne: i });
+      start = i;
+    }
+  }
+  const linieZOdstepami = opisLinii.map(linia => {
+    const odstepy = [];
+    for (let i = linia.od + 1; i < linia.nastepne; i += 1) {
+      const a = wynik[i - 1];
+      const b = wynik[i];
+      if (a && b && Math.round(a.ostatni.top) === Math.round(b.pierwszy.top)) odstepy.push(b.pierwszy.left - a.ostatni.right);
+    }
+    const srednio = odstepy.length ? odstepy.reduce((x, y) => x + y, 0) / odstepy.length : 0;
+    return { nastepneSlowo: linia.nastepne, srednio };
+  });
+  return {
+    linie: linieZOdstepami,
+    przelamane: wynik.filter(x => x && x.przelamane).length,
+    najgorsza: Math.max(0, ...linieZOdstepami.map(l => l.srednio))
+  };
 };
+
+/* Limit przeniesien: O nas — 2 (prosba Oliwii), opisy pakietow — 4
+   (tam klienci zglaszali dziure, nie liczbe przeniesien, a kolumny sa wezsze). */
+const limitPrzeniesien = akapit => (akapit.closest(".packages") ? 4 : MAKS_PRZENIESIEN);
 
 const ograniczDzielenie = akapit => {
-  if (!pelneDzielenie.has(akapit)) {
-    pelneDzielenie.set(akapit, tekstoweWezly(akapit).map(w => w.nodeValue));
-  } else {
-    const zapis = pelneDzielenie.get(akapit);
-    tekstoweWezly(akapit).forEach((w, i) => { if (zapis[i] != null) w.nodeValue = zapis[i]; });
-  }
+  if (!przygotujAkapit(akapit)) return;
+  const slowa = slowaAkapitu(akapit);
+  /* Dwa ostatnie slowa nigdy sie nie dziela. */
+  const zakazane = new Set([slowa.length - 1, slowa.length - 2]);
+  const kandydaci = slowa.map((s, i) => i).filter(i => slowa[i].dzieli && !zakazane.has(i));
+  const wolno = new Set();
+  ulozAkapit(akapit, slowa, wolno);
+  const stan = zmierzAkapit(akapit);
+  const limit = limitPrzeniesien(akapit);
 
-  /* Dwa ostatnie slowa akapitu nigdy sie nie dziela. */
-  slowaZLacznikiem(akapit).slice(-2).reverse().forEach(bezLacznika);
-
-  for (let proba = 0; proba < 12; proba += 1) {
-    const przelamane = slowaZLacznikiem(akapit).filter(slowoPrzelamane);
-    if (przelamane.length <= MAKS_PRZENIESIEN) return;
-    /* Zostawiamy dwa pierwsze przeniesienia, reszta traci dzielenie.
-       Od konca, zeby indeksy wczesniejszych slow w wezle sie nie przesunely. */
-    przelamane.slice(MAKS_PRZENIESIEN).reverse().forEach(bezLacznika);
+  /* Kazda runda: sprawdz KAZDE slowo, ktore da sie podzielic, i wybierz to,
+     ktore najbardziej zmniejsza najwieksza dziure w akapicie (sprawdzane
+     tez pary — wynik praktycznie ten sam przy wielokrotnie dluzszym czasie,
+     wiec zostaje szybsza wersja). */
+  let biezacy = stan;
+  for (let runda = 0; runda < limit; runda += 1) {
+    let najlepszy = null;
+    kandydaci.forEach(i => {
+      if (wolno.has(i)) return;
+      wolno.add(i);
+      ulozAkapit(akapit, slowa, wolno);
+      const proba = zmierzAkapit(akapit);
+      wolno.delete(i);
+      if (proba.przelamane > limit) return;
+      if (proba.najgorsza >= biezacy.najgorsza - 0.5) return;
+      if (!najlepszy || proba.najgorsza < najlepszy.stan.najgorsza) najlepszy = { i, stan: proba };
+    });
+    if (!najlepszy) break;
+    wolno.add(najlepszy.i);
+    biezacy = najlepszy.stan;
   }
+  ulozAkapit(akapit, slowa, wolno);
 };
 
-const ograniczWszystkie = () => akapityONas.forEach(ograniczDzielenie);
-if (akapityONas.length) {
+/* Akapit po akapicie, z przerwa miedzy nimi — kazdy to kilkadziesiat
+   pomiarow ukladu, a razem ok. 0,4 s; w jednym kawalku strona by sie
+   na ten czas przycinala. */
+let przebiegAkapitow = 0;
+const ograniczWszystkie = () => {
+  const przebieg = ++przebiegAkapitow;
+  const kolejka = akapityDoDzielenia.slice();
+  const nastepny = () => {
+    if (przebieg !== przebiegAkapitow) return; /* nowszy przebieg (zmiana szerokosci) */
+    const akapit = kolejka.shift();
+    if (!akapit) {
+      window.dispatchEvent(new Event("akapity-ulozone"));
+      return;
+    }
+    ograniczDzielenie(akapit);
+    window.setTimeout(nastepny, 0);
+  };
+  nastepny();
+};
+if (akapityDoDzielenia.length) {
   (document.fonts?.ready || Promise.resolve()).then(ograniczWszystkie);
-  let szerokoscONas = 0;
-  let czasONas = 0;
+  let szerokoscAkapitow = window.innerWidth;
+  let czasAkapitow = 0;
   window.addEventListener("resize", () => {
-    if (window.innerWidth === szerokoscONas) return;
-    szerokoscONas = window.innerWidth;
-    window.clearTimeout(czasONas);
-    czasONas = window.setTimeout(ograniczWszystkie, 200);
+    if (window.innerWidth === szerokoscAkapitow) return;
+    szerokoscAkapitow = window.innerWidth;
+    window.clearTimeout(czasAkapitow);
+    czasAkapitow = window.setTimeout(ograniczWszystkie, 200);
   });
 }
 
@@ -1646,6 +1757,7 @@ if (siatkaPakietow) {
   }
 
   window.addEventListener("resize", zaplanujPrzeliczenie);
+  window.addEventListener("akapity-ulozone", wyrownajOpisyPakietow);
 
   document.fonts?.ready.then(wyrownajOpisyPakietow);
 }
