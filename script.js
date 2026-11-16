@@ -1,6 +1,36 @@
 const body = document.body;
 const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/* TRYB DIAGNOSTYCZNY — tylko z ?diag=1 w adresie, dla zwyklych gosci
+   nic sie nie zmienia. Pokazuje na ekranie telefonu, co sie naprawde
+   dzieje (wersja plikow, ruch karuzeli, bledy skryptu, fokus/zdarzenia
+   przy zgodzie), bo czesci zachowan iPhone'a nie da sie odtworzyc poza nim. */
+const diag = (() => {
+  if (!/[?&]diag=1/.test(location.search)) return () => {};
+  const pudlo = document.createElement("pre");
+  pudlo.style.cssText = "position:fixed;left:6px;right:6px;bottom:6px;z-index:99999;margin:0;padding:8px;max-height:42vh;overflow:auto;background:rgba(0,0,0,.82);color:#9f9;font:11px/1.35 monospace;white-space:pre-wrap;border-radius:8px;pointer-events:none";
+  const linie = [];
+  const pisz = tekst => {
+    linie.push(`${(performance.now() / 1000).toFixed(1)}s ${tekst}`);
+    if (linie.length > 40) linie.shift();
+    pudlo.textContent = linie.join("\n");
+  };
+  const wersja = document.querySelector('script[src*="script.js"]')?.getAttribute("src") || "?";
+  const css = document.querySelector('link[href*="style.css"]')?.getAttribute("href") || "?";
+  const start = () => {
+    document.body.append(pudlo);
+    pisz(`${wersja} | ${css} | ${innerWidth}x${innerHeight} | rm=${reduceMotion}`);
+    pisz(navigator.userAgent.slice(0, 120));
+  };
+  if (document.body) start(); else document.addEventListener("DOMContentLoaded", start);
+  window.addEventListener("error", e => pisz(`BLAD: ${e.message} @${e.lineno}`));
+  window.addEventListener("unhandledrejection", e => pisz(`BLAD promise: ${e.reason}`));
+  /* Zmiana widocznej wysokosci = iPhone pokazal/schowal pasek systemowy. */
+  window.visualViewport?.addEventListener("resize", () =>
+    pisz(`ekran: widoczna wysokosc ${Math.round(window.visualViewport.height)} (okno ${innerHeight})`));
+  return pisz;
+})();
+
 /* Header and navigation */
 const header = document.querySelector("[data-header]");
 const updateHeader = () => {
@@ -744,10 +774,10 @@ if (viewport && track) {
     karta.offsetLeft + karta.offsetWidth / 2 - viewport.clientWidth / 2;
 
   window.setInterval(() => {
-    if (sliderDesktop || document.hidden || body.classList.contains("is-modal-open")) return;
-    if (performance.now() < pauzaDo) return;
+    if (sliderDesktop || document.hidden || body.classList.contains("is-modal-open")) return diag(`karuzela: pomijam (desktop=${sliderDesktop} hidden=${document.hidden})`);
+    if (performance.now() < pauzaDo) return diag("karuzela: pauza po dotyku");
     const ramka = viewport.getBoundingClientRect();
-    if (ramka.bottom < 0 || ramka.top > window.innerHeight) return;
+    if (ramka.bottom < 0 || ramka.top > window.innerHeight) return diag("karuzela: poza ekranem");
 
     const karty = originals();
     if (karty.length < 2) return;
@@ -759,6 +789,7 @@ if (viewport && track) {
     const maks = viewport.scrollWidth - viewport.clientWidth;
     const naKoncu = teraz >= maks - 4;
     const nastepna = naKoncu || biezaca >= karty.length - 1 ? 0 : biezaca + 1;
+    diag(`karuzela: ${Math.round(teraz)} -> karta ${nastepna} (${Math.round(pozycjaKarty(karty[nastepna]))}) maks=${Math.round(maks)} snap=${getComputedStyle(viewport).scrollSnapType}`);
     przesunKaruzele(Math.max(0, Math.min(maks, pozycjaKarty(karty[nastepna]))));
   }, ODSTEP_RUCHU);
 
@@ -791,7 +822,7 @@ if (viewport && track) {
       const t = Math.min(1, (teraz - start) / czas);
       viewport.scrollLeft = od + droga * krzywa(t);
       if (t < 1) ruchKaruzeli = requestAnimationFrame(klatka);
-      else koniec();
+      else { koniec(); diag(`karuzela: koniec ruchu, scrollLeft=${Math.round(viewport.scrollLeft)} (cel ${Math.round(cel)})`); }
     };
     ruchKaruzeli = requestAnimationFrame(klatka);
   }
@@ -1215,6 +1246,8 @@ document.querySelectorAll(".consent").forEach(etykieta => {
   let dotyk = false;
   etykieta.addEventListener("pointerdown", () => { dotyk = true; }, { passive: true });
   etykieta.addEventListener("touchstart", () => { dotyk = true; }, { passive: true });
+  ["touchstart", "pointerdown", "click"].forEach(z => etykieta.addEventListener(z, () => diag(`zgoda: ${z} scrollY=${Math.round(scrollY)}`), { passive: true }));
+  ["focus", "blur"].forEach(z => pole.addEventListener(z, () => diag(`zgoda: pole ${z} vv=${Math.round(window.visualViewport?.height || 0)}`)));
   pole.addEventListener("change", () => {
     if (dotyk) pole.blur();
     dotyk = false;
