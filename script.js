@@ -25,6 +25,18 @@ const diag = (() => {
   if (document.body) start(); else document.addEventListener("DOMContentLoaded", start);
   window.addEventListener("error", e => pisz(`BLAD: ${e.message} @${e.lineno}`));
   window.addEventListener("unhandledrejection", e => pisz(`BLAD promise: ${e.reason}`));
+  /* Przez 2 s po dotknieciu zgody: kazda animacja/przejscie CSS, fokus
+     i "najechanie" (iPhone emuluje mysz przy dotyku) — z nazwa elementu. */
+  let sledzDo = 0;
+  const nazwa = el => el && el.tagName ? `${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? "." + el.className.trim().split(/\s+/).join(".") : ""}` : "?";
+  document.addEventListener("touchstart", e => {
+    if (e.target.closest?.(".contact-form")) { sledzDo = performance.now() + 2000; pisz(`dotyk: ${nazwa(e.target)}`); }
+  }, { capture: true, passive: true });
+  const jesliSledzimy = f => e => { if (performance.now() < sledzDo) f(e); };
+  document.addEventListener("transitionrun", jesliSledzimy(e => pisz(`przejscie: ${nazwa(e.target)}${e.pseudoElement || ""} ${e.propertyName}`)), true);
+  document.addEventListener("animationstart", jesliSledzimy(e => pisz(`animacja: ${nazwa(e.target)} ${e.animationName}`)), true);
+  document.addEventListener("focusin", jesliSledzimy(e => pisz(`fokus: ${nazwa(e.target)}`)), true);
+  document.addEventListener("mouseover", jesliSledzimy(e => pisz(`najechanie: ${nazwa(e.target)}`)), true);
   /* Zmiana widocznej wysokosci = iPhone pokazal/schowal pasek systemowy. */
   window.visualViewport?.addEventListener("resize", () =>
     pisz(`ekran: widoczna wysokosc ${Math.round(window.visualViewport.height)} (okno ${innerHeight})`));
