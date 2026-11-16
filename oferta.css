@@ -777,7 +777,6 @@
   .offer-matrix__table,
   .offer-matrix__table thead,
   .offer-matrix__table tbody,
-  .offer-matrix__table tr,
   .offer-matrix__table th,
   .offer-matrix__table td {
     display: block;
@@ -789,55 +788,57 @@
     display: none !important;
   }
 
-  .offer-matrix__table thead tr {
+  .offer-matrix__table tr {
     display: grid;
-    gap: 10px;
-    margin-bottom: 34px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .offer-matrix__table thead tr {
+    gap: 4px;
   }
 
   .offer-matrix__table thead th {
     width: auto;
-    padding: 18px 22px 20px;
+    padding: 0;
     border: 1px solid var(--line);
-    border-radius: 26px 26px 4px 26px;
+    border-radius: 14px 14px 3px 14px;
   }
 
-  .offer-matrix__table tbody tr {
-    padding: 18px 22px 12px;
-    margin-bottom: 10px;
-    border: 1px solid var(--line);
-    border-radius: 26px 26px 4px 26px;
+  .offer-matrix__table .offer-matrix__pack {
+    min-height: 80px;
+    padding: 10px 2px;
   }
 
-  .offer-matrix__table tbody tr.offer-matrix__group {
-    padding: 26px 0 4px;
-    margin: 0;
-    border: 0;
+  .offer-matrix__table .offer-matrix__num {
+    margin-bottom: 4px;
+    font-size: 11px;
+    letter-spacing: .08em;
+  }
+
+  .offer-matrix__table .offer-matrix__name {
+    font-size: clamp(16px, 4.4vw, 23px);
+  }
+
+  .offer-matrix__table .offer-matrix__more {
+    margin-top: 6px;
+    gap: 3px;
+    font-size: 10px;
+    letter-spacing: 0;
+  }
+
+  .offer-matrix__table tbody th {
+    grid-column: 1 / -1;
   }
 
   .offer-matrix__table tbody th[scope="row"] {
-    padding: 0 0 12px;
-    border-bottom: 1px solid var(--line);
-    font-size: 16px;
+    padding: 12px 6px 2px;
+    border-bottom: 0;
+    background: rgba(246, 241, 234, .65);
   }
 
   .offer-matrix__table tbody td {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 18px;
-    padding: 9px 0;
-    border-bottom: 0;
-    background: none !important;
-    text-align: right;
-  }
-
-  .offer-matrix__table tbody td::before {
-    content: attr(data-pkg);
-    color: rgba(23, 40, 79, .6);
-    font-size: 13px;
-    letter-spacing: .04em;
-    text-align: left;
+    padding: 4px 0;
+    text-align: center;
   }
 }
 
@@ -1719,4 +1720,8 @@
   .offer-matrix__action-row > .offer-matrix__pdf-wrap {
     justify-self: stretch;
   }
+}
+
+.offer-matrix__pdf-wrap[hidden] {
+  display: none;
 }
