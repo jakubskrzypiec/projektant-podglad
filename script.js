@@ -721,6 +721,48 @@ if ("ResizeObserver" in window && track) {
   carouselResizeObserver.observe(track);
 }
 
+/* TELEFON — karuzela projektow przesuwa sie sama (uwaga 16.11).
+   Na komputerze karuzela plynie ciagle (transform + kopie kart). Na
+   telefonie zostaje przewijanie palcem ze zatrzaskiwaniem na karcie,
+   wiec zamiast ciaglego ruchu (gryzlby sie z zatrzaskiem) co kilka sekund
+   plynnie przechodzimy do nastepnej karty, a po ostatniej wracamy do
+   pierwszej. Dotkniecie karuzeli wstrzymuje ruch na chwile, zeby nie
+   walczyc z palcem; nic sie nie dzieje, gdy karuzela jest poza ekranem,
+   karta przegladarki w tle albo otwarta galeria. */
+if (viewport && track) {
+  const ODSTEP_RUCHU = 3200;
+  const PAUZA_PO_DOTYKU = 6000;
+  let pauzaDo = 0;
+
+  const wstrzymaj = () => { pauzaDo = performance.now() + PAUZA_PO_DOTYKU; };
+  ["touchstart", "pointerdown", "wheel"].forEach(zdarzenie =>
+    viewport.addEventListener(zdarzenie, wstrzymaj, { passive: true }));
+
+  /* Pozycja przewiniecia, przy ktorej karta stoi na srodku (tak jak
+     zatrzaskuje ja scroll-snap-align: center). */
+  const pozycjaKarty = karta =>
+    karta.offsetLeft + karta.offsetWidth / 2 - viewport.clientWidth / 2;
+
+  window.setInterval(() => {
+    if (sliderDesktop || document.hidden || body.classList.contains("is-modal-open")) return;
+    if (performance.now() < pauzaDo) return;
+    const ramka = viewport.getBoundingClientRect();
+    if (ramka.bottom < 0 || ramka.top > window.innerHeight) return;
+
+    const karty = originals();
+    if (karty.length < 2) return;
+    const teraz = viewport.scrollLeft;
+    let biezaca = 0;
+    karty.forEach((karta, i) => {
+      if (Math.abs(pozycjaKarty(karta) - teraz) < Math.abs(pozycjaKarty(karty[biezaca]) - teraz)) biezaca = i;
+    });
+    const maks = viewport.scrollWidth - viewport.clientWidth;
+    const naKoncu = teraz >= maks - 4;
+    const nastepna = naKoncu || biezaca >= karty.length - 1 ? 0 : biezaca + 1;
+    viewport.scrollTo({ left: Math.max(0, Math.min(maks, pozycjaKarty(karty[nastepna]))), behavior: "smooth" });
+  }, ODSTEP_RUCHU);
+}
+
 /* Stable DETAILS animation — FAQ + packages */
 const detailsAnimations = new WeakMap();
 const detailsTargetOpen = new WeakMap();

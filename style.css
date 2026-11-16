@@ -9655,6 +9655,61 @@ body *:not(.about__copy .rich-copy, .about__copy .rich-copy *) {
   transition: none !important;
 }
 
+/* 4c. TELEFON — pakiety na stronie glownej: nazwa pakietu obok cyfry
+   rzymskiej, w lewym gornym rogu kafla (wczesniej nazwa byla pod cyfra,
+   a kafel mial sztywne 250 px wysokosci naglowka). */
+@media (max-width: 820px) {
+  .home .packages .package-card > summary {
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 18px !important;
+    min-height: 0 !important;
+  }
+
+  .home .packages .package-card > summary > span {
+    flex: 0 0 auto;
+    width: auto !important;
+    height: auto !important;
+    font-size: 72px !important;
+    line-height: 1 !important;
+  }
+
+  .home .packages .package-card h3 {
+    flex: 1 1 auto;
+    max-width: none !important;
+    margin: 0 !important;
+    font-size: 30px !important;
+    line-height: 1.05 !important;
+  }
+}
+
+/* 4d. TELEFON — zgoda w formularzu: bez niebieskiego mrugniecia przy
+   dotknieciu. Safari podswietlal na niebiesko caly obszar etykiety
+   (domyslne -webkit-tap-highlight-color), a ukryte pole wyboru bylo
+   pozycjonowane wzgledem odleglego elementu strony zamiast etykiety. */
+.consent {
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.consent * {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.consent input {
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+}
+
+/* Klawiatura: widoczne obramowanie kolka zamiast niewidocznego pola. */
+.consent input:focus-visible + i {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+
 /* 5. Przycisk PDF ukryty (atrybut hidden w oferta.html). Regula potrzebna,
    bo .offer-matrix__pdf-wrap ma wlasne display, ktore wygrywa z [hidden]. */
 .offer-matrix__pdf-wrap[hidden] {
