@@ -649,7 +649,14 @@ const sliderFrame = time => {
   if (!sliderAnimating && sliderSetWidth && !document.hidden) {
     sliderOffset += (delta / 1000) * sliderSpeed;
     normalizeSlider();
-    setTrackPosition(sliderOffset);
+    /* Pozycja zaokraglona do pelnego piksela ekranu (uwaga klienta 16.11:
+       "karuzela drga, shaky shaky"). Przy 14 px/s karuzela przesuwa sie
+       o ok. 0,2 px na klatke; zdjecia w kartach maja wlasne warstwy
+       graficzne i przy ulamkowych pozycjach przegladarka zaokraglala je
+       inaczej niz ramki i tekst — zdjecia "plywaly" wzgledem kart.
+       Liczymy dalej plynnie (sliderOffset), rysujemy w pelnych pikselach. */
+    const dpr = window.devicePixelRatio || 1;
+    setTrackPosition(Math.round(sliderOffset * dpr) / dpr);
   }
   sliderRaf = requestAnimationFrame(sliderFrame);
 };
@@ -1076,7 +1083,13 @@ const protectPolishTypography = node => {
   while (walker.nextNode()) textNodes.push(walker.currentNode);
 
   textNodes.forEach(textNode => {
-    textNode.nodeValue = textNode.nodeValue.replace(/\b([aiouwz])\s+/gi, "$1\u00A0");
+    /* Tylko samodzielne jednoliterowe slowa ("a", "i", "w", "z"...).
+       Wczesniej bylo \b([aiouwz])\s+ \u2014 w JS \b nie zna polskich liter, wiec
+       koncowka "a" po "\u0142" ("przysz\u0142a", "odzwierciedla\u0142a") tez byla brana
+       za spojnik i sklejana z nastepnym slowem. Powstawaly dlugie,
+       nierozerwalne bloki, a linia przed nimi rozciagala sie przy
+       justowaniu ("jak      najlepiej" w Konsultacji, uwaga 16.11). */
+    textNode.nodeValue = textNode.nodeValue.replace(/(^|[\s\u00A0(\u201E"\u00AB])([aiouwz])\s+/gi, "$1$2\u00A0");
   });
 
   /* Join the final two words of the block. This prevents the last line from
@@ -1093,6 +1106,89 @@ document.querySelectorAll(typographySelectors.join(",")).forEach(protectPolishTy
 
 /* Dzielenie wyrazów pozostaje wyłącznie w sekcji O nas. */
 window.dzielenieWyrazowPL?.(".about__copy .rich-copy p");
+/* Opisy pakietow na stronie glownej tez sa justowane — bez dzielenia waska
+   kolumna rozpychala odstepy (uwaga 16.11: "jak      najlepiej"). */
+window.dzielenieWyrazowPL?.(".packages .package-card__body > p");
+
+/* O NAS — najwyzej 2 przeniesienia wyrazow na akapit (uwaga Oliwii 16.11:
+   "tekst jest zbyt pociety pauzami, dwie na akapit moga sie pojawic")
+   i bez dzielenia dwoch ostatnich slow akapitu (przez to na koncu
+   zostawal samotny kawalek wyrazu).
+
+   Przegladarka sama wybiera, w ktorym miekkim laczniku przelamac wiersz,
+   i nie da sie jej podac limitu. Dlatego po ulozeniu tekstu sprawdzamy,
+   ktore slowa faktycznie sie przelamaly (slowo zajmuje 2 wiersze), i jesli
+   w akapicie jest ich wiecej niz 2, zabieramy nadmiarowym slowom mozliwosc
+   dzielenia i ukladamy jeszcze raz. Przy zmianie szerokosci zaczynamy od
+   pelnego dzielenia (zapamietany tekst), bo inna szerokosc = inne lamanie. */
+const MIEKKI_LACZNIK = "­";
+const MAKS_PRZENIESIEN = 2;
+const akapityONas = [...document.querySelectorAll(".about__copy .rich-copy p, .packages .package-card__body > p")];
+const pelneDzielenie = new WeakMap();
+
+const tekstoweWezly = element => {
+  const chodzik = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  const wezly = [];
+  while (chodzik.nextNode()) wezly.push(chodzik.currentNode);
+  return wezly;
+};
+
+/* Slowa z miekkim lacznikiem: [wezel, poczatek, koniec]. */
+const slowaZLacznikiem = akapit => {
+  const wynik = [];
+  tekstoweWezly(akapit).forEach(wezel => {
+    const re = /[^\s ]*­[^\s ]*/g;
+    let m;
+    while ((m = re.exec(wezel.nodeValue))) wynik.push([wezel, m.index, m.index + m[0].length]);
+  });
+  return wynik;
+};
+
+const slowoPrzelamane = ([wezel, od, doZnaku]) => {
+  const zakres = document.createRange();
+  zakres.setStart(wezel, od);
+  zakres.setEnd(wezel, doZnaku);
+  const gory = new Set([...zakres.getClientRects()].filter(r => r.width > 0).map(r => Math.round(r.top)));
+  return gory.size > 1;
+};
+
+const bezLacznika = ([wezel, od, doZnaku]) => {
+  const t = wezel.nodeValue;
+  wezel.nodeValue = t.slice(0, od) + t.slice(od, doZnaku).split(MIEKKI_LACZNIK).join("") + t.slice(doZnaku);
+};
+
+const ograniczDzielenie = akapit => {
+  if (!pelneDzielenie.has(akapit)) {
+    pelneDzielenie.set(akapit, tekstoweWezly(akapit).map(w => w.nodeValue));
+  } else {
+    const zapis = pelneDzielenie.get(akapit);
+    tekstoweWezly(akapit).forEach((w, i) => { if (zapis[i] != null) w.nodeValue = zapis[i]; });
+  }
+
+  /* Dwa ostatnie slowa akapitu nigdy sie nie dziela. */
+  slowaZLacznikiem(akapit).slice(-2).reverse().forEach(bezLacznika);
+
+  for (let proba = 0; proba < 12; proba += 1) {
+    const przelamane = slowaZLacznikiem(akapit).filter(slowoPrzelamane);
+    if (przelamane.length <= MAKS_PRZENIESIEN) return;
+    /* Zostawiamy dwa pierwsze przeniesienia, reszta traci dzielenie.
+       Od konca, zeby indeksy wczesniejszych slow w wezle sie nie przesunely. */
+    przelamane.slice(MAKS_PRZENIESIEN).reverse().forEach(bezLacznika);
+  }
+};
+
+const ograniczWszystkie = () => akapityONas.forEach(ograniczDzielenie);
+if (akapityONas.length) {
+  (document.fonts?.ready || Promise.resolve()).then(ograniczWszystkie);
+  let szerokoscONas = 0;
+  let czasONas = 0;
+  window.addEventListener("resize", () => {
+    if (window.innerWidth === szerokoscONas) return;
+    szerokoscONas = window.innerWidth;
+    window.clearTimeout(czasONas);
+    czasONas = window.setTimeout(ograniczWszystkie, 200);
+  });
+}
 
 /* Process accordion + progress */
 const processItems = [...document.querySelectorAll("[data-process-item]")];
