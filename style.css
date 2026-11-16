@@ -9616,6 +9616,17 @@ body *:not(.about__copy .rich-copy, .about__copy .rich-copy *) {
     min-height: 100svh !important;
   }
 
+  /* Bez animacji "wjazdu" sekcji przy przewijaniu (reveal: przesuniecie
+     o 28 px + rozjasnienie). Na komputerze to plynne pojawianie sie, ale
+     na telefonie kazdy blok podjezdzal w gore w trakcie przewijania palcem
+     — strona "skakala" zaraz po zjechaniu z hero. Wszystko stoi od razu. */
+  .reveal,
+  .reveal.is-visible {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
   /* Bez animacji wejscia (powolne przyblizenie zdjecia) — na telefonie
      dawalo wrazenie skoku zaraz po otwarciu strony. Zdjecie stoi od razu. */
   .hero__image {

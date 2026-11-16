@@ -126,12 +126,16 @@ const trzymajWMiejscu = (element, czas = 320) => {
    moga zsumowac sie w dryf. Dotkniecie ekranu przerywa prowadzenie. */
 const naTelefonie = () => window.matchMedia("(max-width: 820px)").matches;
 
-const prowadzDoElementu = (element, czas = 520, odstep = 14) => {
+/* startYPrzedKliknieciem: pozycja zmierzona PRZED zmiana klas/otwarciem.
+   Na telefonach, ktore nie animuja rozwijania (starsze Safari nie animuja
+   grid-template-rows), uklad zmienia sie od razu i pomiar po zmianie
+   dawalby juz "przeskoczona" pozycje — kafel szarpnalby w pierwszej klatce. */
+const prowadzDoElementu = (element, czas = 520, odstep = 14, startYPrzedKliknieciem = null) => {
   if (!element) return;
   aktywneTrzymanie?.stop();
 
   const start = performance.now();
-  const startY = element.getBoundingClientRect().top;
+  const startY = startYPrzedKliknieciem ?? element.getBoundingClientRect().top;
   const celY = wysokoscNaglowka() + odstep;
   const zdarzenia = ["wheel", "touchstart", "keydown"];
   let przerwane = false;
@@ -171,7 +175,8 @@ const prowadzDoElementu = (element, czas = 520, odstep = 14) => {
     else uchwyt.stop();
   };
 
-  klatka = requestAnimationFrame(krok);
+  /* Pierwsza korekta od razu, jeszcze przed narysowaniem klatki. */
+  krok(start);
 };
 
 const menuButton = document.querySelector(".menu-toggle");
@@ -875,6 +880,7 @@ faqItems.forEach(item => {
        Material UI, itd. dzialaja dokladnie tak). To duzo mniejszy
        i bardziej przewidywalny ruch niz kilkuset-pikselowy dryf calej
        strony. */
+    const startY = item.getBoundingClientRect().top;
     const willOpen = getNextDetailsState(item);
 
     if (willOpen) {
@@ -889,7 +895,7 @@ faqItems.forEach(item => {
     animateDetails(item, willOpen);
 
     /* Tylko telefon, tylko przy otwieraniu. Komputer bez zmian. */
-    if (willOpen && naTelefonie()) prowadzDoElementu(item, 320);
+    if (willOpen && naTelefonie()) prowadzDoElementu(item, 320, 14, startY);
   });
 });
 
@@ -906,9 +912,10 @@ document.querySelectorAll(".extra-service").forEach(item => {
 
   summary.addEventListener("click", event => {
     event.preventDefault();
+    const startY = item.getBoundingClientRect().top;
     const willOpen = getNextDetailsState(item);
     animateDetails(item, willOpen);
-    if (willOpen && naTelefonie()) prowadzDoElementu(item, 320);
+    if (willOpen && naTelefonie()) prowadzDoElementu(item, 320, 14, startY);
   });
 });
 
@@ -990,6 +997,7 @@ processItems.forEach((item, index) => {
   const button = item.querySelector("[data-process-toggle]");
   button?.addEventListener("click", () => {
     const scrollRevision = ++processScrollRevision;
+    const startY = button.getBoundingClientRect().top;
     const willOpen = !item.classList.contains("is-open");
     processItems.forEach(other => {
       const open = willOpen && other === item;
@@ -999,7 +1007,7 @@ processItems.forEach((item, index) => {
 
     if (willOpen && naTelefonie()) {
       /* Telefon: jeden plynny ruch razem z animacja (.55 s w CSS). */
-      prowadzDoElementu(button, 560);
+      prowadzDoElementu(button, 560, 14, startY);
     } else if (willOpen) {
       /* Najpierw kończymy zmianę wysokości obu paneli, potem wyznaczamy
          pozycję nagłówka. Nowe kliknięcie lub ręczne przewijanie anuluje
