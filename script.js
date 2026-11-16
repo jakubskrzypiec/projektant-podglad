@@ -759,8 +759,42 @@ if (viewport && track) {
     const maks = viewport.scrollWidth - viewport.clientWidth;
     const naKoncu = teraz >= maks - 4;
     const nastepna = naKoncu || biezaca >= karty.length - 1 ? 0 : biezaca + 1;
-    viewport.scrollTo({ left: Math.max(0, Math.min(maks, pozycjaKarty(karty[nastepna]))), behavior: "smooth" });
+    przesunKaruzele(Math.max(0, Math.min(maks, pozycjaKarty(karty[nastepna]))));
   }, ODSTEP_RUCHU);
+
+  /* Wlasna animacja scrollLeft zamiast scrollTo({behavior: "smooth"}).
+     Safari na iPhonie potrafi zignorowac plynne przewiniecie kontenera
+     z scroll-snap-type: x mandatory (zatrzask od razu cofa go na biezaca
+     karte) — karuzela stala w miejscu. Na czas przejscia wylaczamy wiec
+     zatrzask i sami przesuwamy scrollLeft w kazdej klatce; po dojechaniu
+     zatrzask wraca, a karta stoi juz dokladnie w punkcie zatrzasku.
+     Dotkniecie w trakcie przerywa ruch i oddaje karuzele palcowi. */
+  let ruchKaruzeli = 0;
+  function przesunKaruzele(cel) {
+    cancelAnimationFrame(ruchKaruzeli);
+    const od = viewport.scrollLeft;
+    const droga = cel - od;
+    if (Math.abs(droga) < 2) return;
+    const czas = Math.min(1100, 520 + Math.abs(droga) * 0.18);
+    const start = performance.now();
+    const krzywa = t => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+    const startPauzy = pauzaDo;
+
+    viewport.style.scrollSnapType = "none";
+    const koniec = () => {
+      cancelAnimationFrame(ruchKaruzeli);
+      viewport.style.scrollSnapType = "";
+    };
+
+    const klatka = teraz => {
+      if (pauzaDo !== startPauzy) return koniec(); /* palec przejal karuzele */
+      const t = Math.min(1, (teraz - start) / czas);
+      viewport.scrollLeft = od + droga * krzywa(t);
+      if (t < 1) ruchKaruzeli = requestAnimationFrame(klatka);
+      else koniec();
+    };
+    ruchKaruzeli = requestAnimationFrame(klatka);
+  }
 }
 
 /* Stable DETAILS animation — FAQ + packages */
@@ -1170,6 +1204,22 @@ const pokazPodziekowanie = () => {
 };
 
 if (params.get("wyslano") === "1") pokazPodziekowanie();
+
+/* Zgoda w formularzu — po zaznaczeniu dotykiem zdejmujemy fokus z ukrytego
+   pola. Na iPhonie fokus na polu formularza potrafi na chwile pokazac
+   systemowy, niebieski element pod formularzem (uwaga 16.11). Zaznaczenie
+   z klawiatury zostawia fokus, zeby dalej dalo sie przejsc Tabem. */
+document.querySelectorAll(".consent").forEach(etykieta => {
+  const pole = etykieta.querySelector("input");
+  if (!pole) return;
+  let dotyk = false;
+  etykieta.addEventListener("pointerdown", () => { dotyk = true; }, { passive: true });
+  etykieta.addEventListener("touchstart", () => { dotyk = true; }, { passive: true });
+  pole.addEventListener("change", () => {
+    if (dotyk) pole.blur();
+    dotyk = false;
+  });
+});
 
 /* Wysylka bez opuszczania strony.
 
