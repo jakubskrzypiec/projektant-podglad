@@ -1720,3 +1720,219 @@
     justify-self: stretch;
   }
 }
+
+
+/* =========================================================
+   UWAGI KLIENTA — 12.11.2026
+   Pakiety na telefonie: zakladki zamiast rozsypanej tabeli.
+   Widok buduje script.js z tej samej tabeli (sekcja "OFERTA NA
+   TELEFONIE"). Na komputerze ukryty — tam zostaje tabela bez zmian.
+   ========================================================= */
+.offer-mobile {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  .offer-mobile {
+    display: block;
+  }
+
+  /* Tabela i rozwijane opisy nad nia — na telefonie zastepuje je widok
+     zakladek (opis pakietu jest w srodku zakladki). */
+  .offer-matrix__scroll,
+  .offer-matrix__panels {
+    display: none !important;
+  }
+
+  .offer-mobile__hint {
+    margin: 0 0 14px;
+    color: rgba(23, 40, 79, .66);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  /* Zakladki przyklejaja sie pod naglowkiem — przy dlugiej liscie mozna
+     przelaczac pakiet bez przewijania do gory. */
+  .offer-mobile__tabs {
+    position: sticky;
+    top: calc(var(--header-h, 64px) + 8px);
+    z-index: 5;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    padding: 6px;
+    border: 1px solid var(--line);
+    border-radius: 22px 22px 4px 22px;
+    background: rgba(245, 242, 237, .94);
+    box-shadow: 0 10px 26px rgba(20, 35, 60, .08);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .offer-mobile__tab {
+    display: grid;
+    gap: 3px;
+    justify-items: center;
+    min-height: 58px;
+    padding: 9px 4px 10px;
+    border: 0;
+    border-radius: 16px 16px 3px 16px;
+    background: transparent;
+    color: var(--navy);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background .25s ease, color .25s ease, box-shadow .25s ease;
+  }
+
+  .offer-mobile__tab-num {
+    color: rgba(23, 40, 79, .58);
+    font-family: var(--body);
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    transition: color .25s ease;
+  }
+
+  .offer-mobile__tab-name {
+    font-family: var(--display);
+    font-size: 19px;
+    letter-spacing: .06em;
+    line-height: 1.1;
+    text-transform: uppercase;
+  }
+
+  .offer-mobile__tab.is-active {
+    background: var(--navy);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(23, 40, 79, .22);
+  }
+
+  .offer-mobile__tab.is-active .offer-mobile__tab-num {
+    color: var(--gold);
+  }
+
+  .offer-mobile__tab:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+  }
+
+  .offer-mobile__body {
+    margin-top: 14px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 26px 26px 4px 26px;
+    background: rgba(255, 255, 255, .5);
+    transition: height .38s cubic-bezier(.2, .75, .25, 1);
+  }
+
+  .offer-mobile__inner {
+    padding: 24px 20px 14px;
+    transition: opacity .3s ease;
+  }
+
+  .offer-mobile__inner.is-entering {
+    opacity: 0;
+  }
+
+  .offer-mobile__num {
+    margin: 0 0 4px;
+    color: var(--gold);
+    font-family: var(--display);
+    font-size: 13px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+  }
+
+  .offer-mobile__name {
+    margin: 0;
+    color: var(--navy);
+    font-family: var(--display);
+    font-size: clamp(34px, 10vw, 44px);
+    font-weight: 400;
+    letter-spacing: .04em;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  .offer-mobile__count {
+    margin: 10px 0 0;
+    color: rgba(23, 40, 79, .62);
+    font-size: 13px;
+    letter-spacing: .04em;
+  }
+
+  .offer-mobile__desc {
+    margin: 18px 0 4px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+
+  .offer-mobile__desc p {
+    margin: 0 0 12px;
+    color: var(--navy);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .offer-mobile__group {
+    margin: 22px 0 6px;
+    color: var(--gold);
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+  }
+
+  .offer-mobile__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .offer-mobile__item {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr);
+    align-items: baseline;
+    column-gap: 10px;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--line);
+    color: var(--navy);
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  .offer-mobile__list .offer-mobile__item:last-child {
+    border-bottom: 0;
+  }
+
+  .offer-mobile__mark {
+    color: var(--gold);
+    font-size: 19px;
+    line-height: 1;
+    text-align: center;
+  }
+
+  .offer-mobile__item--wartosc .offer-mobile__mark {
+    font-family: var(--display);
+    font-size: 17px;
+  }
+
+  /* Pozycje poza pakietem zostaja na liscie, zeby bylo widac roznice
+     miedzy pakietami, ale sa wyraznie przygaszone. */
+  .offer-mobile__item--nie {
+    color: rgba(23, 40, 79, .42);
+  }
+
+  .offer-mobile__item--nie .offer-mobile__mark {
+    color: rgba(23, 40, 79, .3);
+  }
+
+  .offer-mobile__note {
+    grid-column: 2;
+    margin-top: 2px;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+  }
+}

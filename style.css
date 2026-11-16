@@ -9439,3 +9439,180 @@ body *:not(.about__copy .rich-copy, .about__copy .rich-copy *) {
     padding-block: clamp(84px, 8vw, 132px);
   }
 }
+
+/* =========================================================
+   UWAGI KLIENTA — 12.11.2026
+   (mail "TOP Strona - Materialy na strone www")
+   Wszystko w jednym bloku, zeby latwo bylo znalezc i cofnac.
+   ========================================================= */
+
+/* 1. O NAS — zdjecie pracowni zamiast miejsca "Czekamy na zdjecie".
+   Na komputerze kadr przygotowany przez klienta, na telefonie pelne
+   zdjecie (picture/source w HTML). */
+.about__visual {
+  overflow: hidden;
+}
+
+.about__photo,
+.about__photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.about__photo {
+  position: absolute;
+  inset: 0;
+}
+
+.about__photo img {
+  object-fit: cover;
+  object-position: 50% 28%;
+}
+
+/* Kafel z imionami + obowiazkowy podpis zdjecia tuz pod nim. */
+.about__visual .about__caption {
+  position: absolute;
+  z-index: 2;
+  left: clamp(20px, 3vw, 44px);
+  right: clamp(20px, 3vw, 44px);
+  bottom: clamp(20px, 3vw, 44px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+}
+
+.about__visual .about__caption .about__names {
+  position: static;
+  max-width: 100%;
+}
+
+.about__credit {
+  margin: 0;
+  padding: 5px 11px;
+  border-radius: 10px 10px 2px 10px;
+  background: rgba(255, 255, 255, .84);
+  color: var(--navy);
+  font-family: var(--body);
+  font-size: 12px;
+  letter-spacing: .03em;
+  line-height: 1.35;
+}
+
+@media (max-width: 820px) {
+  /* Telefon: zdjecie w pelnej proporcji 3:4, bez przycinania twarzy. */
+  .about__visual {
+    min-height: 0 !important;
+    height: auto !important;
+    aspect-ratio: 1100 / 1467;
+  }
+
+  .about__photo img {
+    object-position: 50% 50%;
+  }
+
+  .about__visual .about__caption {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .about__visual .about__caption .about__names {
+    font-size: 15px !important;
+    padding: 8px 13px;
+  }
+
+  .about__credit {
+    font-size: 11px;
+  }
+}
+
+/* 2. TELEFON — logo na zdjeciu glownym zmienia kolor jak na komputerze:
+   na zdjeciu bialy negatyw bez jasnej plakietki, po przewinieciu pozytyw. */
+@media (max-width: 820px) {
+  body.home .header:not(.is-scrolled):not(.menu-open) .header-logo {
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  body.home .header:not(.is-scrolled):not(.menu-open) .header-logo__img--positive {
+    opacity: 0 !important;
+  }
+
+  body.home .header:not(.is-scrolled):not(.menu-open) .header-logo__img--negative {
+    opacity: 1 !important;
+  }
+}
+
+/* 2b. Nowy link "Strona glowna" w pasku — na waskich ekranach komputera
+   (tablet poziomo, maly laptop) cztery linki dochodzily do ikon social. */
+@media (min-width: 821px) and (max-width: 1100px) {
+  .header .nav {
+    gap: 18px !important;
+  }
+}
+
+/* 3. TELEFON — wiekszy logotyp w otwartym menu. */
+@media (max-width: 820px) {
+  .header .header-logo {
+    transition: width .3s ease, height .3s ease;
+  }
+
+  /* Wyzszy pasek tylko przy otwartym menu, zeby duze logo i przycisk
+     zamkniecia byly wysrodkowane i logo nie dotykalo krawedzi ekranu. */
+  .header.menu-open {
+    height: 86px !important;
+  }
+
+  .header.menu-open .header-logo {
+    width: 190px !important;
+    height: 62px !important;
+    max-width: none !important;
+  }
+}
+
+/* 4. TELEFON — strona nie moze skakac przy przewijaniu.
+   Hero mial min-height: 100dvh. Na iPhonie "dvh" zmienia sie za kazdym
+   razem, gdy chowa sie i wraca pasek adresu Safari, wiec hero rosl
+   i malal w trakcie przewijania, a cala strona pod nim podskakiwala.
+   "svh" jest stale — przeliczane raz, nie przy kazdym ruchu palcem. */
+@media (max-width: 820px) {
+  .hero {
+    min-height: 100vh !important;
+    min-height: 100svh !important;
+  }
+}
+
+/* 5. Przycisk PDF ukryty (atrybut hidden w oferta.html). Regula potrzebna,
+   bo .offer-matrix__pdf-wrap ma wlasne display, ktore wygrywa z [hidden]. */
+.offer-matrix__pdf-wrap[hidden] {
+  display: none !important;
+}
+
+/* 6. Animacje przy wlaczonym "Ogranicz ruch" (iPhone: Dostepnosc > Ruch).
+   Wczesniej to ustawienie wylaczalo WSZYSTKIE animacje do 0,01 ms —
+   harmonijki otwieraly sie skokiem, a zlote slowo w hero sie nie zmienialo.
+   Zostawiamy spokojne przejscia (wysokosc, przenikanie), bez przesuwania. */
+@media (prefers-reduced-motion: reduce) {
+  .process-answer {
+    transition-duration: .4s !important;
+  }
+
+  .offer-matrix__panel,
+  .offer-mobile__body {
+    transition-duration: .35s !important;
+  }
+
+  .hero h1 .hero__gold.is-changing {
+    animation: hero-word-fade .6s ease !important;
+    animation-duration: .6s !important;
+  }
+}
+
+@keyframes hero-word-fade {
+  50% { opacity: 0; }
+}

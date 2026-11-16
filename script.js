@@ -110,6 +110,70 @@ const trzymajWMiejscu = (element, czas = 320) => {
   klatka = requestAnimationFrame(krok);
 };
 
+/* TELEFON — plynne prowadzenie kliknietego kafla pod naglowek
+   (uwaga klienta 12.11: "rozwijane elementy powinny byc gladkie i powinno
+   sie gladko przewijac do nowo kliknietego kafla").
+
+   Wczesniej na telefonie byly dwa osobne ruchy: najpierw sasiedni kafel
+   sie zwijal i kliknietym szarpalo w gore o jego wysokosc, a dopiero po
+   zakonczeniu animacji strona dojezdzala do celu. Teraz przez caly czas
+   trwania animacji w kazdej klatce ustawiamy przewiniecie tak, zeby
+   klikniety kafel plynal z miejsca, w ktorym go dotknieto, do miejsca pod
+   naglowkiem — jednym ruchem, niezaleznie od tego, co zwija sie nad nim.
+
+   To nie jest kumulujaca sie kompensacja (patrz notatka przy FAQ): cel jest
+   staly — pozycja na ekranie pod naglowkiem — wiec kolejne klikniecia nie
+   moga zsumowac sie w dryf. Dotkniecie ekranu przerywa prowadzenie. */
+const naTelefonie = () => window.matchMedia("(max-width: 820px)").matches;
+
+const prowadzDoElementu = (element, czas = 520, odstep = 14) => {
+  if (!element) return;
+  aktywneTrzymanie?.stop();
+
+  const start = performance.now();
+  const startY = element.getBoundingClientRect().top;
+  const celY = wysokoscNaglowka() + odstep;
+  const zdarzenia = ["wheel", "touchstart", "keydown"];
+  let przerwane = false;
+  let klatka = 0;
+
+  /* Ta sama krzywa co animacje wysokosci (cubic-bezier(.2,.75,.25,1))
+     w przyblizeniu — kafel i tresc pod nim koncza ruch razem. */
+  const krzywa = t => 1 - Math.pow(1 - t, 3);
+
+  const przerwij = () => { przerwane = true; };
+  zdarzenia.forEach(z => window.addEventListener(z, przerwij, { passive: true }));
+
+  const uchwyt = {
+    stop() {
+      if (aktywneTrzymanie === uchwyt) aktywneTrzymanie = null;
+      cancelAnimationFrame(klatka);
+      zdarzenia.forEach(z => window.removeEventListener(z, przerwij));
+    }
+  };
+  aktywneTrzymanie = uchwyt;
+
+  const krok = teraz => {
+    if (przerwane || aktywneTrzymanie !== uchwyt) return uchwyt.stop();
+    const t = Math.min(1, (teraz - start) / czas);
+    const docelowo = startY + (celY - startY) * krzywa(t);
+    const roznica = element.getBoundingClientRect().top - docelowo;
+    if (Math.abs(roznica) > 0.5) bezPlynnego(() => window.scrollBy(0, roznica));
+    /* Po koncu krzywej trzymamy cel tak dlugo, jak trwaja jeszcze animacje
+       wysokosci harmonijek (CSS moze skonczyc pozniej, np. gdy telefon
+       zgubi kilka klatek). Twardy limit 2 s — nigdy nie trzymamy strony
+       w nieskonczonosc. */
+    const animacjeTrwaja = () => (document.getAnimations?.() || []).some(animacja =>
+      animacja.playState === "running"
+      && animacja.effect?.target?.closest?.(".process, .faq, .offer-extra, .offer-mobile"));
+    const dalej = teraz - start < czas + 80 || (animacjeTrwaja() && teraz - start < 2000);
+    if (dalej) klatka = requestAnimationFrame(krok);
+    else uchwyt.stop();
+  };
+
+  klatka = requestAnimationFrame(krok);
+};
+
 const menuButton = document.querySelector(".menu-toggle");
 const mobileMenu = document.querySelector(".mobile-menu");
 const closeMenu = () => {
@@ -146,7 +210,10 @@ navLinks.forEach(link => {
 const rotatingWord = document.querySelector("[data-rotating-word]");
 const rotatingWords = ["inspirują", "angażują", "zostają", "intrygują"];
 let rotatingIndex = 0;
-if (rotatingWord && !reduceMotion) {
+/* Bez warunku !reduceMotion (uwaga klienta 12.11: "napisy przy Wnetrza,
+   ktore... sie nie zmieniaja" na telefonie). Przy wlaczonym "Ogranicz ruch"
+   slowo i tak sie zmienia, tylko przenikaniem zamiast przesuniecia (CSS). */
+if (rotatingWord) {
   window.setInterval(() => {
     rotatingWord.classList.add("is-changing");
     window.setTimeout(() => {
@@ -674,7 +741,10 @@ const animateDetails = (item, willOpen) => {
   const summary = item.querySelector(":scope > summary");
   if (!summary) return;
 
-  if (reduceMotion || !item.animate) {
+  /* Harmonijki animuja sie takze przy "Ogranicz ruch" — to tylko zmiana
+     wysokosci, bez przesuwania. Skok bez animacji byl odbierany jako
+     "skakanie strony" (uwaga klienta 12.11). */
+  if (!item.animate) {
     item.open = willOpen;
     detailsTargetOpen.set(item, willOpen);
     return;
@@ -817,6 +887,9 @@ faqItems.forEach(item => {
     }
 
     animateDetails(item, willOpen);
+
+    /* Tylko telefon, tylko przy otwieraniu. Komputer bez zmian. */
+    if (willOpen && naTelefonie()) prowadzDoElementu(item, 320);
   });
 });
 
@@ -833,7 +906,9 @@ document.querySelectorAll(".extra-service").forEach(item => {
 
   summary.addEventListener("click", event => {
     event.preventDefault();
-    animateDetails(item, getNextDetailsState(item));
+    const willOpen = getNextDetailsState(item);
+    animateDetails(item, willOpen);
+    if (willOpen && naTelefonie()) prowadzDoElementu(item, 320);
   });
 });
 
@@ -922,7 +997,10 @@ processItems.forEach((item, index) => {
       other.querySelector("[data-process-toggle]")?.setAttribute("aria-expanded", String(open));
     });
 
-    if (willOpen) {
+    if (willOpen && naTelefonie()) {
+      /* Telefon: jeden plynny ruch razem z animacja (.55 s w CSS). */
+      prowadzDoElementu(button, 560);
+    } else if (willOpen) {
       /* Najpierw kończymy zmianę wysokości obu paneli, potem wyznaczamy
          pozycję nagłówka. Nowe kliknięcie lub ręczne przewijanie anuluje
          poprzedni cel, aby animacje nie przeciągały strony w różne miejsca. */
@@ -1273,6 +1351,11 @@ if (siatkaPakietow) {
 
     opisy.forEach(opis => { opis.style.minHeight = ""; });
 
+    /* Kafle jeden pod drugim (telefon) — nie ma czego wyrownywac w linii,
+       a wyrownanie do najdluzszego opisu robilo puste dziury pod krotszymi. */
+    const lewe = opisy.map(opis => Math.round(opis.getBoundingClientRect().left));
+    if (new Set(lewe).size < 2) return;
+
     /* Kafle zamkniete nie maja wymiarow — nie ma czego wyrownywac. */
     const wysokosci = opisy.map(opis => opis.getBoundingClientRect().height);
     if (!wysokosci.some(Boolean)) return;
@@ -1309,4 +1392,202 @@ if (siatkaPakietow) {
   window.addEventListener("resize", zaplanujPrzeliczenie);
 
   document.fonts?.ready.then(wyrownajOpisyPakietow);
+}
+
+
+/* =============================================================
+   OFERTA NA TELEFONIE — pakiety jako zakladki zamiast tabeli
+   (uwaga klienta 12.11: "tabela z pakietami nie jest dostosowana do
+   wersji mobilnej, obecna wersja jest niefunkcjonalna dla uzytkownika,
+   ktory nie mial wczesniej z nami stycznosci").
+
+   Na telefonie tabela rozpadala sie na osobne kafle "Rzut ukladu
+   funkcjonalnego: Pakiet 1 ✓, Pakiet 2 ✓, Pakiet 3 ✓" — kilkanascie
+   identycznych kafli, z ktorych nie dalo sie odczytac, czym rozni sie
+   jeden pakiet od drugiego. Teraz uzytkownik wybiera pakiet i widzi jego
+   opis oraz pelna liste: co jest w pakiecie, a co nie.
+
+   Widok budujemy z tej samej tabeli, wiec tresc jest w jednym miejscu —
+   zmiana w tabeli (oferta.html) od razu zmienia tez wersje na telefon.
+   Na komputerze nic sie nie zmienia: ten widok jest tam ukryty w CSS.
+   ============================================================= */
+const tabelaOferty = document.querySelector(".offer-matrix__table");
+
+if (tabelaOferty) {
+  const przyciskiPakietow = [...tabelaOferty.querySelectorAll("thead [data-pack-toggle]")];
+  const pakiety = przyciskiPakietow.map(przycisk => ({
+    id: przycisk.dataset.packToggle,
+    numer: przycisk.querySelector(".offer-matrix__num")?.textContent.trim() || "",
+    nazwa: przycisk.querySelector(".offer-matrix__name")?.textContent.trim() || "",
+    opis: document.querySelector(`[data-pack-panel="${przycisk.dataset.packToggle}"] .offer-matrix__panel-inner`)
+  }));
+
+  /* Wiersze tabeli: grupy (naglowki) i pozycje z wartosciami dla pakietow. */
+  const grupy = [];
+  tabelaOferty.querySelectorAll("tbody tr").forEach(wiersz => {
+    if (wiersz.classList.contains("offer-matrix__group")) {
+      grupy.push({ nazwa: wiersz.textContent.trim(), pozycje: [] });
+      return;
+    }
+    if (!grupy.length) grupy.push({ nazwa: "", pozycje: [] });
+    const komorki = [...wiersz.querySelectorAll("td")].map(td => {
+      if (td.querySelector(".of-yes")) return { typ: "tak" };
+      if (td.querySelector(".of-no")) return { typ: "nie" };
+      return { typ: "wartosc", tekst: td.textContent.trim() };
+    });
+    grupy[grupy.length - 1].pozycje.push({
+      nazwa: wiersz.querySelector("th")?.textContent.trim() || "",
+      komorki
+    });
+  });
+
+  const el = (tag, klasa, tekst) => {
+    const node = document.createElement(tag);
+    if (klasa) node.className = klasa;
+    if (tekst != null) node.textContent = tekst;
+    return node;
+  };
+
+  const widok = el("div", "offer-mobile reveal");
+  widok.setAttribute("data-offer-mobile", "");
+
+  const podpowiedz = el("p", "offer-mobile__hint", "Wybierz pakiet, aby zobaczyć, co zawiera.");
+  const zakladki = el("div", "offer-mobile__tabs");
+  zakladki.setAttribute("role", "tablist");
+  zakladki.setAttribute("aria-label", "Pakiety projektowe");
+
+  const cialo = el("div", "offer-mobile__body");
+  cialo.setAttribute("role", "tabpanel");
+  cialo.id = "offer-mobile-panel";
+
+  let aktywny = -1;
+  let animacjaWysokosci = 0;
+  let przyciski = [];
+
+  const zbudujTresc = indeks => {
+    const pakiet = pakiety[indeks];
+    const tresc = el("div", "offer-mobile__inner");
+
+    const wszystkie = grupy.flatMap(grupa => grupa.pozycje);
+    const zawarte = wszystkie.filter(pozycja => pozycja.komorki[indeks]?.typ !== "nie").length;
+
+    const glowa = el("div", "offer-mobile__head");
+    glowa.append(
+      el("p", "offer-mobile__num", pakiet.numer),
+      el("h3", "offer-mobile__name", pakiet.nazwa),
+      el("p", "offer-mobile__count", `${zawarte} z ${wszystkie.length} pozycji w pakiecie`)
+    );
+    tresc.append(glowa);
+
+    if (pakiet.opis) {
+      const opis = el("div", "offer-mobile__desc");
+      pakiet.opis.querySelectorAll("p").forEach(akapit => opis.append(el("p", "", akapit.textContent.trim())));
+      tresc.append(opis);
+    }
+
+    grupy.forEach(grupa => {
+      if (grupa.nazwa) tresc.append(el("h4", "offer-mobile__group", grupa.nazwa));
+      const lista = el("ul", "offer-mobile__list");
+      grupa.pozycje.forEach(pozycja => {
+        const komorka = pozycja.komorki[indeks] || { typ: "nie" };
+        const li = el("li", `offer-mobile__item offer-mobile__item--${komorka.typ}`);
+        const znak = el("span", "offer-mobile__mark", komorka.typ === "tak" ? "✓" : komorka.typ === "nie" ? "—" : komorka.tekst);
+        znak.setAttribute("aria-hidden", "true");
+        li.append(znak, el("span", "offer-mobile__label", pozycja.nazwa));
+        if (komorka.typ === "nie") li.append(el("span", "offer-mobile__note", "poza pakietem"));
+        const dlaCzytnika = komorka.typ === "tak" ? "w pakiecie" : komorka.typ === "nie" ? "" : `w pakiecie: ${komorka.tekst}`;
+        if (dlaCzytnika) li.append(el("span", "visually-hidden", ` — ${dlaCzytnika}`));
+        lista.append(li);
+      });
+      tresc.append(lista);
+    });
+
+    tresc.querySelectorAll(".offer-mobile__desc p").forEach(protectPolishTypography);
+    return tresc;
+  };
+
+  const pokazPakiet = indeks => {
+    if (indeks === aktywny) return;
+    const pierwszy = aktywny === -1;
+    aktywny = indeks;
+
+    przyciski.forEach((przycisk, i) => {
+      const wybrany = i === indeks;
+      przycisk.setAttribute("aria-selected", String(wybrany));
+      przycisk.tabIndex = wybrany ? 0 : -1;
+      przycisk.classList.toggle("is-active", wybrany);
+    });
+    cialo.setAttribute("aria-labelledby", przyciski[indeks].id);
+
+    const nowa = zbudujTresc(indeks);
+
+    if (pierwszy) {
+      cialo.replaceChildren(nowa);
+      return;
+    }
+
+    /* Zakladki sa przyklejone pod naglowkiem, wiec "zawsze widac" je na
+       ekranie. Jesli poczatek listy schowal sie juz pod nimi (uzytkownik byl
+       nizej), po zmianie pakietu wracamy lagodnie na poczatek nowego pakietu. */
+    const dolZakladek = zakladki.getBoundingClientRect().bottom;
+    const goraCiala = cialo.getBoundingClientRect().top;
+    if (goraCiala < dolZakladek) {
+      const odstepPodZakladkami = 14;
+      window.scrollTo({
+        top: Math.max(0, window.scrollY + goraCiala - dolZakladek - odstepPodZakladkami),
+        behavior: reduceMotion ? "auto" : "smooth"
+      });
+    }
+
+    /* Plynna zmiana wysokosci + przenikanie tresci, zeby nic nie skakalo. */
+    window.clearTimeout(animacjaWysokosci);
+    const z = cialo.getBoundingClientRect().height;
+    cialo.style.height = `${z}px`;
+    cialo.replaceChildren(nowa);
+    nowa.classList.add("is-entering");
+    const na = nowa.getBoundingClientRect().height;
+    cialo.getBoundingClientRect();
+    cialo.style.height = `${na}px`;
+    requestAnimationFrame(() => requestAnimationFrame(() => nowa.classList.remove("is-entering")));
+
+    animacjaWysokosci = window.setTimeout(() => {
+      cialo.style.height = "";
+    }, 420);
+  };
+
+  przyciski = pakiety.map((pakiet, indeks) => {
+    const przycisk = el("button", "offer-mobile__tab");
+    przycisk.type = "button";
+    przycisk.id = `offer-mobile-tab-${pakiet.id}`;
+    przycisk.setAttribute("role", "tab");
+    przycisk.setAttribute("aria-controls", cialo.id);
+    przycisk.append(el("span", "offer-mobile__tab-num", pakiet.numer), el("span", "offer-mobile__tab-name", pakiet.nazwa));
+    przycisk.addEventListener("click", () => pokazPakiet(indeks));
+    zakladki.append(przycisk);
+    return przycisk;
+  });
+
+  /* Strzalki lewo/prawo przelaczaja zakladki — standard dla role="tablist". */
+  zakladki.addEventListener("keydown", event => {
+    if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+    const nastepny = (aktywny + (event.key === "ArrowRight" ? 1 : -1) + przyciski.length) % przyciski.length;
+    pokazPakiet(nastepny);
+    przyciski[nastepny].focus();
+  });
+
+  widok.append(podpowiedz, zakladki, cialo);
+  const tabelaKontener = tabelaOferty.closest(".offer-matrix__scroll");
+  tabelaKontener?.parentNode.insertBefore(widok, tabelaKontener);
+  pokazPakiet(0);
+
+  /* Reveal dla nowego elementu — ten sam efekt co reszta strony. */
+  if (reduceMotion || !("IntersectionObserver" in window)) widok.classList.add("is-visible");
+  else {
+    const obserwator = new IntersectionObserver(wpisy => {
+      if (!wpisy.some(w => w.isIntersecting)) return;
+      widok.classList.add("is-visible");
+      obserwator.disconnect();
+    }, { threshold: .01, rootMargin: "0px 0px 90px 0px" });
+    obserwator.observe(widok);
+  }
 }
