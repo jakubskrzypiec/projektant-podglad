@@ -9649,6 +9649,12 @@ body *:not(.about__copy .rich-copy, .about__copy .rich-copy *) {
   }
 }
 
+/* 4b. TELEFON — przy otwieraniu etapu pozostale zwijaja sie natychmiast
+   (skrypt dodaje te klase na jedna chwile, patrz naTelefonie w script.js). */
+.bez-animacji .process-answer {
+  transition: none !important;
+}
+
 /* 5. Przycisk PDF ukryty (atrybut hidden w oferta.html). Regula potrzebna,
    bo .offer-matrix__pdf-wrap ma wlasne display, ktore wygrywa z [hidden]. */
 .offer-matrix__pdf-wrap[hidden] {

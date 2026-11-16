@@ -110,73 +110,56 @@ const trzymajWMiejscu = (element, czas = 320) => {
   klatka = requestAnimationFrame(krok);
 };
 
-/* TELEFON — plynne prowadzenie kliknietego kafla pod naglowek
-   (uwaga klienta 12.11: "rozwijane elementy powinny byc gladkie i powinno
-   sie gladko przewijac do nowo kliknietego kafla").
+/* TELEFON — otwieranie kafli (etapy, FAQ, dodatkowe uslugi) bez skakania.
+   Uwaga klienta 12.11 + test na iPhonie 14 w Safari: "klikam i rzuca
+   gora-dol".
 
-   Wczesniej na telefonie byly dwa osobne ruchy: najpierw sasiedni kafel
-   sie zwijal i kliknietym szarpalo w gore o jego wysokosc, a dopiero po
-   zakonczeniu animacji strona dojezdzala do celu. Teraz przez caly czas
-   trwania animacji w kazdej klatce ustawiamy przewiniecie tak, zeby
-   klikniety kafel plynal z miejsca, w ktorym go dotknieto, do miejsca pod
-   naglowkiem — jednym ruchem, niezaleznie od tego, co zwija sie nad nim.
+   Poprzednia wersja (16.11 rano) w kazdej klatce animacji korygowala
+   przewiniecie (scrollBy) i na ten czas wylaczala globalne
+   scroll-behavior: smooth atrybutem na <html>. Chrome stosuje taki atrybut
+   od razu, ale Safari NIE przelicza stylu przed scrollBy — kazda korekta
+   startowala wiec jako osobna PLYNNA animacja, kilkadziesiat na sekunde,
+   ktore sie scigaly. Stad "gora-dol". W emulacji (Chrome) niewidoczne.
 
-   To nie jest kumulujaca sie kompensacja (patrz notatka przy FAQ): cel jest
-   staly — pozycja na ekranie pod naglowkiem — wiec kolejne klikniecia nie
-   moga zsumowac sie w dryf. Dotkniecie ekranu przerywa prowadzenie. */
+   Teraz nie ma zadnych korekt w petli. Przy otwieraniu na telefonie:
+   1. poprzednio otwarty kafel zwijamy NATYCHMIAST (bez animacji),
+   2. w tej samej chwili — zanim telefon narysuje klatke — jednym
+      natychmiastowym przewinieciem oddajemy dokladnie tyle, o ile kafel
+      nad kliknietym sie skrocil; klikniety kafel zostaje pod palcem,
+   3. klikniety kafel rozwija sie juz z animacja — rosnie W DOL, wiec nic
+      nad nim sie nie rusza,
+   4. jedno natywne, plynne przewiniecie przegladarki doprowadza go pod
+      naglowek. Cel jest staly (nic nad kaflem juz sie nie zmienia), wiec
+      nie ma sie z czym scigac.
+   Komputer bez zmian. */
 const naTelefonie = () => window.matchMedia("(max-width: 820px)").matches;
 
-/* startYPrzedKliknieciem: pozycja zmierzona PRZED zmiana klas/otwarciem.
-   Na telefonach, ktore nie animuja rozwijania (starsze Safari nie animuja
-   grid-template-rows), uklad zmienia sie od razu i pomiar po zmianie
-   dawalby juz "przeskoczona" pozycje — kafel szarpnalby w pierwszej klatce. */
-const prowadzDoElementu = (element, czas = 520, odstep = 14, startYPrzedKliknieciem = null) => {
-  if (!element) return;
-  aktywneTrzymanie?.stop();
+/* Natychmiastowe przewiniecie, odporne na globalne scroll-behavior: smooth
+   rowniez w Safari: styl inline + wymuszone przeliczenie PRZED scrollTo. */
+const przewinNatychmiast = cel => {
+  const korzen = document.documentElement;
+  const poprzedni = korzen.style.scrollBehavior;
+  korzen.style.scrollBehavior = "auto";
+  void getComputedStyle(korzen).scrollBehavior;
+  window.scrollTo(0, Math.max(0, cel));
+  korzen.style.scrollBehavior = poprzedni;
+};
 
-  const start = performance.now();
-  const startY = startYPrzedKliknieciem ?? element.getBoundingClientRect().top;
-  const celY = wysokoscNaglowka() + odstep;
-  const zdarzenia = ["wheel", "touchstart", "keydown"];
-  let przerwane = false;
-  let klatka = 0;
+/* Zmien uklad (zwin inne kafle) tak, zeby wskazany element zostal w tym
+   samym miejscu ekranu. Wywolywane synchronicznie w kliknieciu — przed
+   narysowaniem klatki — wiec zmiany wysokosci nad elementem nie widac. */
+const zmienBezPrzesuniecia = (element, zmiana) => {
+  const przed = element.getBoundingClientRect().top;
+  zmiana();
+  const po = element.getBoundingClientRect().top;
+  if (Math.abs(po - przed) > 0.5) przewinNatychmiast(window.scrollY + (po - przed));
+};
 
-  /* Ta sama krzywa co animacje wysokosci (cubic-bezier(.2,.75,.25,1))
-     w przyblizeniu — kafel i tresc pod nim koncza ruch razem. */
-  const krzywa = t => 1 - Math.pow(1 - t, 3);
-
-  const przerwij = () => { przerwane = true; };
-  zdarzenia.forEach(z => window.addEventListener(z, przerwij, { passive: true }));
-
-  const uchwyt = {
-    stop() {
-      if (aktywneTrzymanie === uchwyt) aktywneTrzymanie = null;
-      cancelAnimationFrame(klatka);
-      zdarzenia.forEach(z => window.removeEventListener(z, przerwij));
-    }
-  };
-  aktywneTrzymanie = uchwyt;
-
-  const krok = teraz => {
-    if (przerwane || aktywneTrzymanie !== uchwyt) return uchwyt.stop();
-    const t = Math.min(1, (teraz - start) / czas);
-    const docelowo = startY + (celY - startY) * krzywa(t);
-    const roznica = element.getBoundingClientRect().top - docelowo;
-    if (Math.abs(roznica) > 0.5) bezPlynnego(() => window.scrollBy(0, roznica));
-    /* Po koncu krzywej trzymamy cel tak dlugo, jak trwaja jeszcze animacje
-       wysokosci harmonijek (CSS moze skonczyc pozniej, np. gdy telefon
-       zgubi kilka klatek). Twardy limit 2 s — nigdy nie trzymamy strony
-       w nieskonczonosc. */
-    const animacjeTrwaja = () => (document.getAnimations?.() || []).some(animacja =>
-      animacja.playState === "running"
-      && animacja.effect?.target?.closest?.(".process, .faq, .offer-extra, .offer-mobile"));
-    const dalej = teraz - start < czas + 80 || (animacjeTrwaja() && teraz - start < 2000);
-    if (dalej) klatka = requestAnimationFrame(krok);
-    else uchwyt.stop();
-  };
-
-  /* Pierwsza korekta od razu, jeszcze przed narysowaniem klatki. */
-  krok(start);
+/* Jedno plynne, natywne przewiniecie: element pod naglowek. */
+const przewinPodNaglowek = (element, odstep = 14) => {
+  const cel = window.scrollY + element.getBoundingClientRect().top - wysokoscNaglowka() - odstep;
+  if (Math.abs(cel - window.scrollY) < 2) return;
+  window.scrollTo({ top: Math.max(0, cel), behavior: reduceMotion ? "auto" : "smooth" });
 };
 
 const menuButton = document.querySelector(".menu-toggle");
@@ -839,6 +822,23 @@ const animateDetails = (item, willOpen) => {
   };
 };
 
+/* Zwiniecie harmonijki natychmiast, bez animacji — z przerwaniem animacji,
+   ktora moglaby jeszcze trwac po szybkim klikaniu. */
+const zamknijDetailsOdRazu = item => {
+  const running = detailsAnimations.get(item);
+  if (running) {
+    running.onfinish = null;
+    running.oncancel = null;
+    running.cancel();
+    detailsAnimations.delete(item);
+  }
+  item.open = false;
+  item.style.height = "";
+  item.style.overflow = "";
+  delete item.dataset.animating;
+  detailsTargetOpen.set(item, false);
+};
+
 const getNextDetailsState = item => {
   if (detailsTargetOpen.has(item) && item.dataset.animating === "true") {
     return !detailsTargetOpen.get(item);
@@ -880,22 +880,21 @@ faqItems.forEach(item => {
        Material UI, itd. dzialaja dokladnie tak). To duzo mniejszy
        i bardziej przewidywalny ruch niz kilkuset-pikselowy dryf calej
        strony. */
-    const startY = item.getBoundingClientRect().top;
     const willOpen = getNextDetailsState(item);
+    const otwarteInne = faqItems.filter(other =>
+      other !== item && (other.open || detailsTargetOpen.get(other) === true));
 
-    if (willOpen) {
-      faqItems.forEach(other => {
-        if (other === item) return;
-        if (other.open || detailsTargetOpen.get(other) === true) {
-          animateDetails(other, false);
-        }
-      });
+    /* Telefon: inne pytania zwijamy od razu, bez przesuniecia kliknietego
+       (opis przy naTelefonie u gory pliku), potem jedno plynne przewiniecie. */
+    if (willOpen && naTelefonie()) {
+      zmienBezPrzesuniecia(item, () => otwarteInne.forEach(zamknijDetailsOdRazu));
+      animateDetails(item, true);
+      przewinPodNaglowek(item);
+      return;
     }
 
+    if (willOpen) otwarteInne.forEach(other => animateDetails(other, false));
     animateDetails(item, willOpen);
-
-    /* Tylko telefon, tylko przy otwieraniu. Komputer bez zmian. */
-    if (willOpen && naTelefonie()) prowadzDoElementu(item, 320, 14, startY);
   });
 });
 
@@ -912,10 +911,11 @@ document.querySelectorAll(".extra-service").forEach(item => {
 
   summary.addEventListener("click", event => {
     event.preventDefault();
-    const startY = item.getBoundingClientRect().top;
     const willOpen = getNextDetailsState(item);
     animateDetails(item, willOpen);
-    if (willOpen && naTelefonie()) prowadzDoElementu(item, 320, 14, startY);
+    /* Uslugi otwieraja sie niezaleznie (nic nad kliknieta sie nie zwija),
+       wiec wystarczy jedno plynne przewiniecie pod naglowek. */
+    if (willOpen && naTelefonie()) przewinPodNaglowek(item);
   });
 });
 
@@ -997,18 +997,31 @@ processItems.forEach((item, index) => {
   const button = item.querySelector("[data-process-toggle]");
   button?.addEventListener("click", () => {
     const scrollRevision = ++processScrollRevision;
-    const startY = button.getBoundingClientRect().top;
     const willOpen = !item.classList.contains("is-open");
-    processItems.forEach(other => {
-      const open = willOpen && other === item;
+    const ustawStan = (other, open) => {
       other.classList.toggle("is-open", open);
       other.querySelector("[data-process-toggle]")?.setAttribute("aria-expanded", String(open));
-    });
+    };
 
     if (willOpen && naTelefonie()) {
-      /* Telefon: jeden plynny ruch razem z animacja (.55 s w CSS). */
-      prowadzDoElementu(button, 560, 14, startY);
-    } else if (willOpen) {
+      /* Telefon: inne etapy zwijamy od razu (bez animacji, klasa
+         .bez-animacji wylacza transition w CSS), klikniety zostaje pod
+         palcem, potem rozwija sie z animacja i jedno plynne przewiniecie
+         prowadzi go pod naglowek. Opis przy naTelefonie u gory pliku. */
+      const lista = item.parentElement;
+      zmienBezPrzesuniecia(button, () => {
+        lista.classList.add("bez-animacji");
+        processItems.forEach(other => { if (other !== item) ustawStan(other, false); });
+        void lista.offsetHeight;
+      });
+      lista.classList.remove("bez-animacji");
+      ustawStan(item, true);
+      przewinPodNaglowek(button);
+    } else {
+      processItems.forEach(other => ustawStan(other, willOpen && other === item));
+    }
+
+    if (willOpen && !naTelefonie()) {
       /* Najpierw kończymy zmianę wysokości obu paneli, potem wyznaczamy
          pozycję nagłówka. Nowe kliknięcie lub ręczne przewijanie anuluje
          poprzedni cel, aby animacje nie przeciągały strony w różne miejsca. */
