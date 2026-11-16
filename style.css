@@ -9692,8 +9692,20 @@ body *:not(.about__copy .rich-copy, .about__copy .rich-copy *) {
   -webkit-tap-highlight-color: transparent;
 }
 
-.consent * {
+/* Podswietlenie dotyku Safari wylaczone na calej stronie — iPhone rysowal
+   niebieska smuge na elemencie nadrzednym formularza (nie na samej
+   etykiecie), wiec wylaczenie tylko na .consent nie wystarczylo.
+   Kazdy przycisk i link ma wlasne stany :hover/:active, wiec nic nie ginie. */
+html,
+body,
+* {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Ukryte pole bez natywnego wygladu — iOS nie ma czego narysowac. */
+.consent input {
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .consent input {

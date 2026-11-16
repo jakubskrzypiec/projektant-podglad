@@ -760,7 +760,7 @@ if ("ResizeObserver" in window && track) {
    walczyc z palcem; nic sie nie dzieje, gdy karuzela jest poza ekranem,
    karta przegladarki w tle albo otwarta galeria. */
 if (viewport && track) {
-  const ODSTEP_RUCHU = 3200;
+  const ODSTEP_RUCHU = 2500;
   const PAUZA_PO_DOTYKU = 6000;
   let pauzaDo = 0;
 
@@ -806,7 +806,9 @@ if (viewport && track) {
     const od = viewport.scrollLeft;
     const droga = cel - od;
     if (Math.abs(droga) < 2) return;
-    const czas = Math.min(1100, 520 + Math.abs(droga) * 0.18);
+    /* Ok. 0,45 s na jedna karte; dluzszy powrot z ostatniej na pierwsza
+       maks. 0,9 s, zeby nie "przelecial" w mgnieniu oka. */
+    const czas = Math.min(900, 380 + Math.abs(droga) * 0.2);
     const start = performance.now();
     const krzywa = t => (t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
     const startPauzy = pauzaDo;
