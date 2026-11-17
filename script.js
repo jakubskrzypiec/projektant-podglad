@@ -1074,7 +1074,9 @@ const typographySelectors = [
   ".offer-matrix__panel-inner p",
   ".offer-matrix__pdf-note",
   ".offer-consult__intro p",
-  ".offer-consult__journey-row p"
+  ".offer-consult__journey-row p",
+  /* Dodatkowe uslugi — nowe teksty od klientow (17.11). */
+  ".extra-service__body-inner p"
 ];
 
 const protectPolishTypography = node => {
