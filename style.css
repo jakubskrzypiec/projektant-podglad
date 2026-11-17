@@ -9666,6 +9666,36 @@ body *:not(.about__copy .rich-copy, .about__copy .rich-copy *) {
   }
 }
 
+/* 2c. Stopka — ikony social mediow (Facebook, Instagram, LinkedIn, TikTok)
+   rowniez na komputerze. Starsza regula ukrywala je powyzej 900 px
+   (display: none !important), a klienci prosili o TikToka "w stopce" —
+   bez tego na komputerze nie bylo go widac (tak jak FB i IG). */
+.footer .footer__socials {
+  display: flex !important;
+}
+
+/* 2d. Karuzela na komputerze — zdjecia bez osobnych warstw graficznych.
+   Zdjecie w karcie mialo translateZ(0) + backface-visibility: hidden, czyli
+   wlasna warstwe, przycinana zaokraglonymi rogami przycisku (overflow:
+   hidden + border-radius). Przy przesuwaniu tasmy o ulamki piksela
+   przegladarka wyrownywala warstwe zdjecia i maske rogow do siatki pikseli
+   osobno — zdjecie drgalo o piksel wzgledem ramki ("shaky shaky", uwagi
+   16.11 i 17.11). Teraz zdjecie rysuje sie razem z karta, w jednej
+   warstwie tasmy. Powiekszenie po najechaniu zostaje. */
+@media (min-width: 821px) {
+  .projects__track .project-card > button > img {
+    transform: scale(1.006) !important;
+    backface-visibility: visible !important;
+    -webkit-backface-visibility: visible !important;
+    will-change: auto !important;
+  }
+
+  .projects__track .project-card:hover > button > img,
+  .projects__track .project-card:focus-within > button > img {
+    transform: scale(1.035) !important;
+  }
+}
+
 /* 3. TELEFON — wiekszy logotyp w otwartym menu. */
 @media (max-width: 820px) {
   .header .header-logo {
