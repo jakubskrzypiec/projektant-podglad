@@ -593,8 +593,6 @@ const projectNext = document.querySelector("[data-project-next]");
 let sliderOffset = 0;
 let sliderSetWidth = 0;
 let sliderAnimating = false;
-let sliderRaf = 0;
-let sliderLast = 0;
 let sliderDesktop = false;
 let sliderFinishTimer = 0;
 let sliderMotionId = 0;
@@ -640,39 +638,53 @@ const normalizeSlider = () => {
   while (sliderOffset < 0) sliderOffset += sliderSetWidth;
 };
 
-const sliderFrame = time => {
-  if (!sliderDesktop || !track) return;
-  if (!sliderLast) sliderLast = time;
-  const delta = Math.min(50, Math.max(0, time - sliderLast));
-  sliderLast = time;
+/* Ciagly ruch karuzeli jako animacja przegladarki (Web Animations),
+   a nie przesuwanie w petli requestAnimationFrame.
 
-  if (!sliderAnimating && sliderSetWidth && !document.hidden) {
-    sliderOffset += (delta / 1000) * sliderSpeed;
-    normalizeSlider();
-    /* Pozycja zaokraglona do pelnego piksela ekranu (uwaga klienta 16.11:
-       "karuzela drga, shaky shaky"). Przy 14 px/s karuzela przesuwa sie
-       o ok. 0,2 px na klatke; zdjecia w kartach maja wlasne warstwy
-       graficzne i przy ulamkowych pozycjach przegladarka zaokraglala je
-       inaczej niz ramki i tekst — zdjecia "plywaly" wzgledem kart.
-       Liczymy dalej plynnie (sliderOffset), rysujemy w pelnych pikselach. */
-    const dpr = window.devicePixelRatio || 1;
-    setTrackPosition(Math.round(sliderOffset * dpr) / dpr);
-  }
-  sliderRaf = requestAnimationFrame(sliderFrame);
+   Uwaga klientow 16.11 i 17.11: "karuzela drga / laguje". Petla w JS
+   przesuwala tasme co klatke o ok. 0,2 px; kazda zgubiona klatka glownego
+   watku (ladowanie zdjec, przewijanie) dawala szarpniecie, a proba
+   zaokraglania do pelnych pikseli zamienila plynny ruch w skoki co 1 px.
+   Animacja liniowa jest prowadzona przez karte graficzna (compositor):
+   plynna, z ulamkami piksela, niezalezna od tego, co robi skrypt strony.
+   Cala tasma (z kartami i zdjeciami) przesuwa sie jako jedna warstwa,
+   wiec zdjecia nie "plywaja" wzgledem ramek. */
+let sliderAnim = null;
+
+const startAutoplay = () => {
+  if (!sliderDesktop || !track || !sliderSetWidth || !track.animate) return;
+  sliderAnim?.cancel();
+  normalizeSlider();
+  setTrackPosition(sliderOffset);
+  sliderAnim = track.animate(
+    [{ transform: "translate3d(0px,0,0)" }, { transform: `translate3d(${-sliderSetWidth}px,0,0)` }],
+    { duration: (sliderSetWidth / sliderSpeed) * 1000, iterations: Infinity, easing: "linear" }
+  );
+  sliderAnim.currentTime = (sliderOffset / sliderSpeed) * 1000;
+};
+
+/* Zatrzymaj w aktualnym, widocznym miejscu (do klikniecia strzalki). */
+const stopAutoplay = () => {
+  if (!sliderAnim) return;
+  sliderOffset = readRenderedSliderOffset();
+  sliderAnim.cancel();
+  sliderAnim = null;
+  normalizeSlider();
+  setTrackPosition(sliderOffset);
 };
 
 const setupSlider = () => {
   if (!track || !viewport) return;
   const shouldDesktop = window.innerWidth > 820;
 
-  cancelAnimationFrame(sliderRaf);
+  sliderAnim?.cancel();
+  sliderAnim = null;
   window.clearTimeout(sliderFinishTimer);
   sliderMotionId += 1;
   clearClones();
   track.style.transition = "none";
   track.style.transform = "none";
   sliderOffset = 0;
-  sliderLast = 0;
   sliderDesktop = shouldDesktop;
 
   if (!shouldDesktop) return;
@@ -688,7 +700,7 @@ const setupSlider = () => {
   requestAnimationFrame(() => {
     measureSlider();
     setTrackPosition(0);
-    sliderRaf = requestAnimationFrame(sliderFrame);
+    startAutoplay();
   });
 };
 
@@ -708,6 +720,7 @@ const nudgeSlider = direction => {
   /* Każde kliknięcie przejmuje aktualną, widoczną pozycję karuzeli.
      Poprzednio kilka timeoutów kończyło animacje w innej kolejności:
      stary timeout cofał nowszy ruch albo zostawiał autoplay zatrzymany. */
+  stopAutoplay();
   if (sliderAnimating) {
     sliderOffset = readRenderedSliderOffset();
     track.style.transition = "none";
@@ -741,7 +754,7 @@ const nudgeSlider = direction => {
     normalizeSlider();
     setTrackPosition(sliderOffset);
     sliderAnimating = false;
-    sliderLast = performance.now();
+    startAutoplay();
   }, 740);
 };
 
@@ -749,7 +762,6 @@ const nudgeSlider = direction => {
    Hover is reserved for the card overlay, as requested. */
 projectPrev?.addEventListener("click", () => nudgeSlider(-1));
 projectNext?.addEventListener("click", () => nudgeSlider(1));
-document.addEventListener("visibilitychange", () => { sliderLast = performance.now(); });
 
 if (document.readyState === "complete") setupSlider();
 else window.addEventListener("load", setupSlider, { once: true });
@@ -763,9 +775,12 @@ window.addEventListener("resize", () => {
 if ("ResizeObserver" in window && track) {
   const carouselResizeObserver = new ResizeObserver(() => {
     if (!sliderDesktop || sliderAnimating) return;
+    const szla = Boolean(sliderAnim);
+    stopAutoplay();
     measureSlider();
     normalizeSlider();
     setTrackPosition(sliderOffset);
+    if (szla) startAutoplay();
   });
   carouselResizeObserver.observe(track);
 }
@@ -1040,12 +1055,52 @@ document.querySelectorAll(".extra-service").forEach(item => {
   summary.addEventListener("click", event => {
     event.preventDefault();
     const willOpen = getNextDetailsState(item);
+    /* Przy zamykaniu zdejmij wyrownanie wysokosci (patrz DODATKOWE USLUGI) —
+       inaczej animacja zmierzylaby wysokosc docelowa z wyrownaniem i kafel
+       by sie nie zwinal. Po animacji wyrownanie liczy sie od nowa. */
+    if (!willOpen) document.querySelectorAll(".offer-extra__list .extra-service").forEach(u => { u.style.minHeight = ""; });
     animateDetails(item, willOpen);
     /* Uslugi otwieraja sie niezaleznie (nic nad kliknieta sie nie zwija),
        wiec wystarczy jedno plynne przewiniecie pod naglowek. */
     if (willOpen && naTelefonie()) przewinPodNaglowek(item);
   });
 });
+
+/* DODATKOWE USLUGI — otwarte kafle w tym samym rzedzie maja rowna wysokosc
+   (uwaga 17.11: "wyrownaj te kafelki"). Przez CSS (align-self: stretch)
+   sie nie da: rozwijany <details> z overflow: hidden zle podaje siatce
+   swoja wysokosc i tekst byl obcinany (rzad 128 px przy tresci 209 px).
+   Po kazdym otwarciu/zamknieciu (gdy zadna animacja juz nie trwa) mierzymy
+   naturalna wysokosc otwartych kafli w rzedzie i ustawiamy obu wyzsza.
+   Zamkniete kafle zostaja niskie. Na telefonie (jedna kolumna) nic. */
+const uslugi = [...document.querySelectorAll(".offer-extra__list .extra-service")];
+if (uslugi.length) {
+  const wyrownajUslugi = () => {
+    if (uslugi.some(u => u.dataset.animating)) return;
+    uslugi.forEach(u => { u.style.minHeight = ""; });
+    const rzedy = new Map();
+    uslugi.forEach(u => {
+      const gora = Math.round(u.getBoundingClientRect().top + window.scrollY);
+      if (!rzedy.has(gora)) rzedy.set(gora, []);
+      rzedy.get(gora).push(u);
+    });
+    rzedy.forEach(rzad => {
+      const otwarte = rzad.filter(u => u.open);
+      if (rzad.length < 2 || otwarte.length < 2) return;
+      const najwyzszy = Math.max(...otwarte.map(u => u.getBoundingClientRect().height));
+      otwarte.forEach(u => { u.style.minHeight = `${najwyzszy}px`; });
+    });
+  };
+  let czasUslug = 0;
+  const zaplanujUslugi = () => {
+    window.clearTimeout(czasUslug);
+    czasUslug = window.setTimeout(wyrownajUslugi, 60);
+  };
+  new MutationObserver(zaplanujUslugi).observe(document.querySelector(".offer-extra__list"), {
+    attributes: true, subtree: true, attributeFilter: ["open", "data-animating"]
+  });
+  window.addEventListener("resize", zaplanujUslugi);
+}
 
 /* Polish typography: no hanging one-letter words and no single-word orphans.
    We leave headings with intentional <br> breaks alone and protect editorial copy only. */
@@ -1555,7 +1610,6 @@ document.querySelector("[data-pdf-preview]")?.addEventListener("click", event =>
   button.setAttribute("aria-expanded", String(!note.hidden));
 });
 
-window.addEventListener("beforeunload", () => cancelAnimationFrame(sliderRaf));
 
 
 /* =============================================================
