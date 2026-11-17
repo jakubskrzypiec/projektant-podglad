@@ -9645,15 +9645,20 @@ body *:not(.about__copy .rich-copy, .about__copy .rich-copy *) {
   }
 }
 
-/* 1181-1400 px: tu widac przycisk "Skontaktuj sie z nami" i wysrodkowane
-   linki wjezdzalyby na ikony (zmierzone: do 34 px przy 1280 px). W tym
-   zakresie linki stoja posrodku miedzy logo a ikonami. Kolumna logo ma
-   stala szerokosc — inaczej zmienia sie przy zabarwieniu paska (154/168 px)
-   i linki przesuwaly sie o 7 px przy przewijaniu. */
-@media (min-width: 1181px) and (max-width: 1400px) {
-  .header {
+/* 821-1560 px: przy 4 ikonach (doszedl TikTok) wysrodkowane linki
+   wjezdzalyby na ikony (zmierzone: -17 px przy 1440, -35 px przy 1401).
+   W tym zakresie linki stoja posrodku miedzy logo a ikonami. Kolumna logo
+   ma stala szerokosc — inaczej zmienia sie przy zabarwieniu paska
+   (154/168 px) i linki przesuwalyby sie przy przewijaniu. Powyzej 1560 px
+   linki sa wysrodkowane na stronie, jak wczesniej. */
+@media (min-width: 821px) and (max-width: 1560px) {
+  /* Te same selektory co starsza regula (.header.is-scrolled ... 154px
+     !important) — inaczej po zabarwieniu paska wygrywala ona. */
+  .header,
+  .header.is-scrolled,
+  body:not(.home) .header {
     grid-template-columns: 168px minmax(0, 1fr) auto !important;
-    column-gap: clamp(18px, 2vw, 32px) !important;
+    column-gap: clamp(14px, 2vw, 32px) !important;
   }
 
   .header .nav {
@@ -9666,12 +9671,22 @@ body *:not(.about__copy .rich-copy, .about__copy .rich-copy *) {
   }
 }
 
-/* 2c. Stopka — ikony social mediow (Facebook, Instagram, LinkedIn, TikTok)
-   rowniez na komputerze. Starsza regula ukrywala je powyzej 900 px
-   (display: none !important), a klienci prosili o TikToka "w stopce" —
-   bez tego na komputerze nie bylo go widac (tak jak FB i IG). */
-.footer .footer__socials {
-  display: flex !important;
+/* Wezsze ekrany komputera (821-1280 px): troche mniejsze ikony
+   i odstepy, zeby 4 linki, 4 ikony i przycisk miescily sie z zapasem
+   (przy 1181 px bylo tylko 7 px odstepu). */
+@media (min-width: 821px) and (max-width: 1280px) {
+  .header .social--header {
+    width: 38px !important;
+    height: 38px !important;
+  }
+
+  .header > .header-actions {
+    gap: 8px !important;
+  }
+
+  .header .nav {
+    gap: 16px !important;
+  }
 }
 
 /* 2d. Karuzela na komputerze — zdjecia bez osobnych warstw graficznych.

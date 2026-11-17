@@ -596,7 +596,10 @@ let sliderAnimating = false;
 let sliderDesktop = false;
 let sliderFinishTimer = 0;
 let sliderMotionId = 0;
-const sliderSpeed = 14; // px / second — deliberately calm, but clearly moving
+/* 35 px/s (17.11). Przy 14 px/s ruch o ok. 0,1 px na klatke na zwyklym
+   ekranie dawal migotanie krawedzi zdjec ("shaky") mimo idealnie rownych
+   klatek; przy 35 px/s ruch jest plynny dla oka. */
+const sliderSpeed = 35; // px / second
 
 const originals = () => [...(track?.querySelectorAll("[data-project-card]:not([data-clone])") || [])];
 const clearClones = () => track?.querySelectorAll("[data-clone]").forEach(clone => clone.remove());
