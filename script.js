@@ -1409,11 +1409,17 @@ processItems.forEach((item, index) => {
       other.querySelector("[data-process-toggle]")?.setAttribute("aria-expanded", String(open));
     };
 
-    if (willOpen && naTelefonie()) {
-      /* Telefon: inne etapy zwijamy od razu (bez animacji, klasa
-         .bez-animacji wylacza transition w CSS), klikniety zostaje pod
-         palcem, potem rozwija sie z animacja i jedno plynne przewiniecie
-         prowadzi go pod naglowek. Opis przy naTelefonie u gory pliku. */
+    if (willOpen) {
+      /* Inne etapy zwijamy od razu (bez animacji, klasa .bez-animacji
+         wylacza transition w CSS), a klikniety etap zostaje dokladnie tam,
+         gdzie go kliknieto, i rozwija sie z animacja w dol.
+         Telefon: potem jedno plynne przewiniecie pod naglowek (opis przy
+         naTelefonie u gory pliku).
+         Komputer: bez automatycznego przewijania (uwaga 17.11: "tak
+         szybko przewija strone gwaltownie"). Wczesniej zwijanie etapu nad
+         kliknietym przez 0,55 s szarpalo kaflem w gore, a potem strona
+         jeszcze dojezdzala do niego plynnym przewinieciem — dwa szybkie
+         ruchy pod rzad. Teraz kafel stoi pod kursorem. */
       const lista = item.parentElement;
       zmienBezPrzesuniecia(button, () => {
         lista.classList.add("bez-animacji");
@@ -1422,25 +1428,11 @@ processItems.forEach((item, index) => {
       });
       lista.classList.remove("bez-animacji");
       ustawStan(item, true);
-      przewinPodNaglowek(button);
+      if (naTelefonie()) przewinPodNaglowek(button);
     } else {
-      processItems.forEach(other => ustawStan(other, willOpen && other === item));
+      ustawStan(item, false);
     }
-
-    if (willOpen && !naTelefonie()) {
-      /* Najpierw kończymy zmianę wysokości obu paneli, potem wyznaczamy
-         pozycję nagłówka. Nowe kliknięcie lub ręczne przewijanie anuluje
-         poprzedni cel, aby animacje nie przeciągały strony w różne miejsca. */
-      window.requestAnimationFrame(() => {
-        const animations = processItems.flatMap(other =>
-          other.querySelector(".process-answer")?.getAnimations() || []
-        );
-        Promise.allSettled(animations.map(animation => animation.finished)).then(() => {
-          if (scrollRevision !== processScrollRevision || !item.classList.contains("is-open")) return;
-          przewinDoElementu(button, { plynnie: true });
-        });
-      });
-    }
+    void scrollRevision;
 
     setProcessProgress(index + 1);
 
