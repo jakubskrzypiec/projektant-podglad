@@ -197,11 +197,55 @@ const zmienBezPrzesuniecia = (element, zmiana) => {
   if (Math.abs(po - przed) > 0.5) przewinNatychmiast(window.scrollY + (po - przed));
 };
 
-/* Jedno plynne, natywne przewiniecie: element pod naglowek. */
-const przewinPodNaglowek = (element, odstep = 14) => {
-  const cel = window.scrollY + element.getBoundingClientRect().top - wysokoscNaglowka() - odstep;
-  if (Math.abs(cel - window.scrollY) < 2) return;
-  window.scrollTo({ top: Math.max(0, cel), behavior: reduceMotion ? "auto" : "smooth" });
+/* Plynne przewiniecie elementu pod naglowek — prowadzone przez skrypt,
+   w tym samym tempie i z ta sama krzywa co rozwijanie kafla.
+
+   Uwaga 17.11 (iPhone): "rozwija sie nierowno, idzie w dol i potem skacze
+   do gory". Wczesniej rozwijanie (0,55 s) i natywne plynne przewiniecie
+   przegladarki (w Safari krotsze, inna krzywa) szly kazde swoim tempem.
+   Teraz to jeden ruch: przez caly czas animacji ustawiamy przewiniecie
+   klatka po klatce. Globalne scroll-behavior: smooth wylaczamy RAZ na
+   czas ruchu (styl inline + wymuszone przeliczenie), a nie w kazdej
+   klatce — dokladnie to w poprzedniej wersji Safari ignorowal i kazda
+   klatka startowala osobna plynna animacje. Cel liczony jest raz: elementy
+   nad kafelkiem nie zmieniaja juz wysokosci (zwiniete od razu, patrz
+   zmienBezPrzesuniecia). Dotyk, kolko myszy lub klawisz przerywa ruch. */
+let biezacyRuch = null;
+const przewinPodNaglowek = (element, odstep = 14, czas = 560) => {
+  biezacyRuch?.();
+  const od = window.scrollY;
+  const cel = Math.max(0, od + element.getBoundingClientRect().top - wysokoscNaglowka() - odstep);
+  if (Math.abs(cel - od) < 2) return;
+
+  const korzen = document.documentElement;
+  const poprzedni = korzen.style.scrollBehavior;
+  korzen.style.scrollBehavior = "auto";
+  void getComputedStyle(korzen).scrollBehavior;
+
+  const zdarzenia = ["wheel", "touchstart", "keydown"];
+  let klatka = 0;
+  const koniec = () => {
+    cancelAnimationFrame(klatka);
+    zdarzenia.forEach(z => window.removeEventListener(z, koniec));
+    korzen.style.scrollBehavior = poprzedni;
+    if (biezacyRuch === koniec) biezacyRuch = null;
+  };
+  zdarzenia.forEach(z => window.addEventListener(z, koniec, { passive: true }));
+  biezacyRuch = koniec;
+
+  /* Ta sama krzywa co rozwijanie: cubic-bezier(.2,.75,.25,1) w przyblizeniu. */
+  const krzywa = t => 1 - Math.pow(1 - t, 3);
+  const start = performance.now();
+  const trwanie = reduceMotion ? 1 : czas;
+  const krok = teraz => {
+    const t = Math.min(1, (teraz - start) / trwanie);
+    /* Dol strony rosnie razem z rozwijanym kaflem — nie wychodzimy za niego. */
+    const maks = korzen.scrollHeight - window.innerHeight;
+    window.scrollTo(0, Math.min(maks, od + (cel - od) * krzywa(t)));
+    if (t < 1) klatka = requestAnimationFrame(krok);
+    else koniec();
+  };
+  klatka = requestAnimationFrame(krok);
 };
 
 const menuButton = document.querySelector(".menu-toggle");
@@ -1035,7 +1079,7 @@ faqItems.forEach(item => {
     if (willOpen && naTelefonie()) {
       zmienBezPrzesuniecia(item, () => otwarteInne.forEach(zamknijDetailsOdRazu));
       animateDetails(item, true);
-      przewinPodNaglowek(item);
+      przewinPodNaglowek(item, 14, 380);
       return;
     }
 
@@ -1065,7 +1109,7 @@ document.querySelectorAll(".extra-service").forEach(item => {
     animateDetails(item, willOpen);
     /* Uslugi otwieraja sie niezaleznie (nic nad kliknieta sie nie zwija),
        wiec wystarczy jedno plynne przewiniecie pod naglowek. */
-    if (willOpen && naTelefonie()) przewinPodNaglowek(item);
+    if (willOpen && naTelefonie()) przewinPodNaglowek(item, 14, 380);
   });
 });
 
@@ -1411,15 +1455,11 @@ processItems.forEach((item, index) => {
 
     if (willOpen) {
       /* Inne etapy zwijamy od razu (bez animacji, klasa .bez-animacji
-         wylacza transition w CSS), a klikniety etap zostaje dokladnie tam,
-         gdzie go kliknieto, i rozwija sie z animacja w dol.
-         Telefon: potem jedno plynne przewiniecie pod naglowek (opis przy
-         naTelefonie u gory pliku).
-         Komputer: bez automatycznego przewijania (uwaga 17.11: "tak
-         szybko przewija strone gwaltownie"). Wczesniej zwijanie etapu nad
-         kliknietym przez 0,55 s szarpalo kaflem w gore, a potem strona
-         jeszcze dojezdzala do niego plynnym przewinieciem — dwa szybkie
-         ruchy pod rzad. Teraz kafel stoi pod kursorem. */
+         wylacza transition w CSS), a klikniety zostaje w miejscu — nic nad
+         nim sie juz nie rusza. Potem rozwija sie z animacja, a strona w tym
+         samym tempie dojezdza tak, zeby etap stal pod naglowkiem i dalo sie
+         go od razu czytac (uwagi 17.11: komputer "gwaltownie przewija",
+         telefon "idzie w dol i skacze do gory" — wczesniej dwa osobne ruchy). */
       const lista = item.parentElement;
       zmienBezPrzesuniecia(button, () => {
         lista.classList.add("bez-animacji");
@@ -1428,7 +1468,9 @@ processItems.forEach((item, index) => {
       });
       lista.classList.remove("bez-animacji");
       ustawStan(item, true);
-      if (naTelefonie()) przewinPodNaglowek(button);
+      /* Jeden ruch razem z rozwijaniem (.55 s w CSS) — telefon i komputer:
+         klikniety etap staje pod naglowkiem, gotowy do czytania. */
+      przewinPodNaglowek(button, 14, 560);
     } else {
       ustawStan(item, false);
     }
