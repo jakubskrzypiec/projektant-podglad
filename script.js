@@ -1112,7 +1112,7 @@ window.dzielenieWyrazowPL?.(".packages .package-card__body > p");
 
 /* O NAS i PAKIETY — najwyzej 2 przeniesienia wyrazow na akapit (uwaga Oliwii
    16.11: "tekst jest zbyt pociety pauzami, dwie na akapit moga sie pojawic"),
-   bez dzielenia dwoch ostatnich slow akapitu (na koncu zostawal samotny
+   bez dzielenia ostatniego slowa akapitu (na koncu zostawal samotny
    kawalek wyrazu) — i przy tym jak najmniejsze dziury miedzy slowami.
 
    Przegladarka sama wybiera, gdzie przelamac wiersz, i nie zna limitu.
@@ -1186,6 +1186,7 @@ const ulozAkapit = (akapit, slowa, wolno) => {
 /* Pomiar: dla kazdego slowa pierwszy i ostatni prostokat oraz linie. */
 const zmierzAkapit = akapit => {
   const wezly = tekstoweWezly(akapit);
+  const prawaKrawedz = akapit.getBoundingClientRect().right;
   /* Slowa mierzymy w aktualnym tekscie, kolejno — ta sama kolejnosc
      i liczba slow co w slowaAkapitu (laczniki nie zmieniaja podzialu). */
   const wynik = [];
@@ -1221,7 +1222,21 @@ const zmierzAkapit = akapit => {
       const b = wynik[i];
       if (a && b && Math.round(a.ostatni.top) === Math.round(b.pierwszy.top)) odstepy.push(b.pierwszy.left - a.ostatni.right);
     }
-    const srednio = odstepy.length ? odstepy.reduce((x, y) => x + y, 0) / odstepy.length : 0;
+    let srednio = odstepy.length ? odstepy.reduce((x, y) => x + y, 0) / odstepy.length : 0;
+    /* Linia z jednym slowem nie ma odstepow, ale tez nie da sie jej
+       wyjustowac — zostaje puste miejsce do prawej krawedzi (zmierzone:
+       samo "odzwierciedlala" i 153 px pustego w Konsultacji projektowej).
+       Liczymy ja jako dziure rowna temu wolnemu miejscu. */
+    if (!odstepy.length) {
+      const gora = Math.round(wynik[linia.od]?.pierwszy.top ?? 0);
+      let prawa = 0;
+      for (let i = linia.od; i < linia.nastepne; i += 1) {
+        const s = wynik[i];
+        if (!s) continue;
+        [s.pierwszy, s.ostatni].forEach(r => { if (Math.round(r.top) === gora) prawa = Math.max(prawa, r.right); });
+      }
+      if (prawa) srednio = Math.max(0, prawaKrawedz - prawa);
+    }
     return { nastepneSlowo: linia.nastepne, srednio };
   });
   return {
@@ -1238,8 +1253,11 @@ const limitPrzeniesien = akapit => (akapit.closest(".packages") ? 4 : MAKS_PRZEN
 const ograniczDzielenie = akapit => {
   if (!przygotujAkapit(akapit)) return;
   const slowa = slowaAkapitu(akapit);
-  /* Dwa ostatnie slowa nigdy sie nie dziela. */
-  const zakazane = new Set([slowa.length - 1, slowa.length - 2]);
+  /* Ostatnie slowo nigdy sie nie dzieli (samotny kawalek wyrazu na koncu).
+     Przedostatnie moze: ostatnia linia ma wtedy i tak 2 czesci, a bez tego
+     sklejona para konczaca akapit potrafila zostawic jedno slowo samo
+     w linii ("odzwierciedlala" + 153 px pustego w Konsultacji). */
+  const zakazane = new Set([slowa.length - 1]);
   const kandydaci = slowa.map((s, i) => i).filter(i => slowa[i].dzieli && !zakazane.has(i));
   const wolno = new Set();
   ulozAkapit(akapit, slowa, wolno);

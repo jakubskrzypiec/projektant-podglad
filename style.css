@@ -9541,9 +9541,35 @@ body *:not(.about__copy .rich-copy, .about__copy .rich-copy *) {
 /* 1b. O NAS — uwagi Oliwii 16.11.
    - Kolumny tekstu rowne (wczesniej prawa szersza: 46,5 / 53,5).
    - Podpis zdjecia blizej rogu. */
+/* Kolumny O nas: rowna szerokosc I rowna wysokosc. Przy dwoch osobnych
+   blokach (po 2 akapity) rowna szerokosc dawala rozne dlugosci kolumn
+   (zmierzone: 27-83 px roznicy). Teraz cztery akapity plyna przez dwie
+   kolumny jak w gazecie — przegladarka sama wyrownuje ich wysokosc,
+   a orphans/widows: 2 nie zostawia pojedynczej linii na dole ani na
+   gorze kolumny (to byl powod rezygnacji z kolumn 25.09). */
 @media (min-width: 821px) {
   .about__copy .rich-copy {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    display: block !important;
+    column-count: 2;
+    column-gap: clamp(28px, 3.2vw, 46px);
+    column-fill: balance;
+  }
+
+  .about__copy .rich-copy > div {
+    display: contents !important;
+  }
+
+  .about__copy .rich-copy p {
+    margin: 0 0 16px !important;
+    /* Starsze reguly mialy break-inside: avoid — akapit nie mogl przejsc
+       do drugiej kolumny i wyrownanie wysokosci nie dzialalo. */
+    break-inside: auto !important;
+    orphans: 2;
+    widows: 2;
+  }
+
+  .about__copy .rich-copy > div:last-child > p:last-child {
+    margin-bottom: 0 !important;
   }
 }
 
