@@ -9629,15 +9629,30 @@ body *:not(.about__copy .rich-copy, .about__copy .rich-copy *) {
 
 /* 2b. Gorny pasek (komputer) — 4 linki + 3 ikony (doszedl LinkedIn).
    Uwaga klientow 16.11: "wyrownaj odstepy pomiedzy przyciskami na pasku
-   gornym". Nawigacja byla wysrodkowana absolutnie wzgledem calej strony,
-   wiec nie wiedziala o ikonach po prawej i przy 1181-1440 px wjezdzala na
-   nie (zmierzone: do 34 px nakladania przy 1280 px). Teraz stoi
-   w srodkowej kolumnie miedzy logo a ikonami: odstep logo->linki i
-   linki->ikony jest zawsze rowny, a nakladanie jest niemozliwe.
-   Miedzy ikonami i przyciskiem rowne 12 px. */
+   gornym". Linki zostaja wysrodkowane na stronie, jak wczesniej; mniejsze
+   odstepy miedzy nimi, rowne 12 px miedzy ikonami i przyciskiem. */
 @media (min-width: 821px) {
+  .header .nav {
+    gap: clamp(18px, 2.4vw, 40px) !important;
+  }
+
+  .header > .header-actions {
+    gap: 12px !important;
+  }
+
+  .header-actions .drop-button {
+    margin-left: 0 !important;
+  }
+}
+
+/* 1181-1400 px: tu widac przycisk "Skontaktuj sie z nami" i wysrodkowane
+   linki wjezdzalyby na ikony (zmierzone: do 34 px przy 1280 px). W tym
+   zakresie linki stoja posrodku miedzy logo a ikonami. Kolumna logo ma
+   stala szerokosc — inaczej zmienia sie przy zabarwieniu paska (154/168 px)
+   i linki przesuwaly sie o 7 px przy przewijaniu. */
+@media (min-width: 1181px) and (max-width: 1400px) {
   .header {
-    grid-template-columns: auto minmax(0, 1fr) auto !important;
+    grid-template-columns: 168px minmax(0, 1fr) auto !important;
     column-gap: clamp(18px, 2vw, 32px) !important;
   }
 
@@ -9647,16 +9662,7 @@ body *:not(.about__copy .rich-copy, .about__copy .rich-copy *) {
     transform: none !important;
     grid-column: 2 !important;
     justify-self: center !important;
-    gap: clamp(18px, 2.4vw, 40px) !important;
     margin: 0 !important;
-  }
-
-  .header > .header-actions {
-    gap: 12px !important;
-  }
-
-  .header-actions .drop-button {
-    margin-left: 0 !important;
   }
 }
 
