@@ -642,11 +642,7 @@ let sliderFinishTimer = 0;
 let sliderMotionId = 0;
 /* 14 px/s — wczesniejsze, spokojne tempo (prosba klientow 18.11,
    po probie z 35 px/s). */
-/* Tymczasowo do porownania na podgladzie: ?tempo=20 (px/s) oraz
-   ?karuzela=plynna (ulamki piksela) / ?karuzela=piksele (pelne piksele). */
-const ustawieniaKaruzeli = new URLSearchParams(location.search);
-const sliderSpeed = Number(ustawieniaKaruzeli.get("tempo")) || 14; // px / second
-const karuzelaPiksele = ustawieniaKaruzeli.get("karuzela") !== "plynna";
+const sliderSpeed = 14; // px / second
 
 const originals = () => [...(track?.querySelectorAll("[data-project-card]:not([data-clone])") || [])];
 const clearClones = () => track?.querySelectorAll("[data-clone]").forEach(clone => clone.remove());
@@ -708,34 +704,48 @@ const startAutoplay = () => {
   normalizeSlider();
   setTrackPosition(sliderOffset);
 
-  /* Ruch zawsze o pelne piksele ekranu (18.11). Przy 14 px/s tasma
-     przesuwa sie o ok. 0,1-0,2 piksela na klatke; przy ulamkowych
-     polozeniach przegladarka za kazdym razem inaczej rozmywa krawedzie
-     zdjec — w Edge widac to jako migotanie, w Firefoksie jako drganie.
-     Na pelnych pikselach ekranu kazda klatka jest ostra i identyczna,
-     a krok to 1 piksel ekranu (na ekranach o wysokiej gestosci pol
-     piksela strony), wiec ruch dalej wyglada na ciagly. */
-  const gestosc = karuzelaPiksele ? (window.devicePixelRatio || 1) : 1000;
-  const kroki = Math.max(1, Math.round(sliderSetWidth * gestosc));
-
   if (firefox) {
-    /* Firefox: tasma (ok. 7000 px szerokosci) jest za szeroka, zeby
-       animacja przegladarki szla w calosci na karcie graficznej — Firefox
-       dorysowuje ja kawalkami i ruch staje, a potem przeskakuje (filmik
-       klientow z 17.11). Tu tasme przesuwa petla klatek; sama zmiana
-       transform nie wymaga przerysowania. */
-    const odStartu = sliderOffset;
-    const start = performance.now();
+    /* Firefox (pomiary z nagran ekranu, 18.11):
+       - animacja przegladarki calej tasmy (ok. 7000 px) nie idzie w
+         calosci na karcie graficznej — Firefox dorysowuje ja kawalkami
+         (filmik klientow z 17.11: ruch staje i przeskakuje);
+       - przy polozeniach w ulamkach piksela Firefox przyciaga napisy pod
+         zdjeciami do pelnych pikseli w innych chwilach niz zdjecia —
+         podpisy "tykaja", a zdjecia sie przesuwaja, wiec karta drga;
+       - przy pelnych pikselach liczonych z czasu zdjecie i napis jada
+         idealnie razem, ale kroki wypadaja nierowno (co 3, 4 albo 5
+         klatek ekranu) — taki rytm tez wyglada na drganie.
+       Dlatego tutaj: zawsze dokladnie 1 piksel ekranu co stala liczbe
+       klatek ekranu (rowny rytm), dobrana tak, zeby tempo bylo jak
+       najblizsze 14 px/s przy czestotliwosci odswiezania tego ekranu. */
+    const gestosc = window.devicePixelRatio || 1;
+    sliderOffset = Math.round(sliderOffset * gestosc) / gestosc;
+    setTrackPosition(sliderOffset);
+    const coIleKlatek = fps => Math.max(1, Math.round(fps / (sliderSpeed * gestosc)));
+    let co = coIleKlatek(60);
+    const odstepy = [];
+    let poprzednia = 0;
+    let licznik = 0;
     let klatka = 0;
-    let ostatni = -1;
     track.style.willChange = "transform";
     const krok = teraz => {
-      sliderOffset = odStartu + ((teraz - start) / 1000) * sliderSpeed;
-      normalizeSlider();
-      const piksel = Math.round(sliderOffset * gestosc);
-      if (piksel !== ostatni) {
-        ostatni = piksel;
-        setTrackPosition(piksel / gestosc);
+      if (poprzednia && odstepy.length < 30) {
+        odstepy.push(teraz - poprzednia);
+        if (odstepy.length === 30) {
+          const srodkowy = [...odstepy].sort((a, b) => a - b)[15];
+          if (srodkowy > 0) co = coIleKlatek(1000 / srodkowy);
+        }
+      }
+      poprzednia = teraz;
+      licznik += 1;
+      if (licznik >= co) {
+        licznik = 0;
+        sliderOffset += 1 / gestosc;
+        normalizeSlider();
+        /* Po zawinieciu petli (szerokosc zestawu nie musi byc pelnym
+           pikselem) z powrotem na siatke pikseli ekranu. */
+        sliderOffset = Math.round(sliderOffset * gestosc) / gestosc;
+        setTrackPosition(sliderOffset);
       }
       klatka = requestAnimationFrame(krok);
     };
@@ -744,8 +754,8 @@ const startAutoplay = () => {
     return;
   }
   sliderAnim = track.animate(
-    [{ transform: "translate3d(0px,0,0)" }, { transform: `translate3d(${-kroki / gestosc}px,0,0)` }],
-    { duration: (sliderSetWidth / sliderSpeed) * 1000, iterations: Infinity, easing: karuzelaPiksele ? `steps(${kroki}, end)` : "linear" }
+    [{ transform: "translate3d(0px,0,0)" }, { transform: `translate3d(${-sliderSetWidth}px,0,0)` }],
+    { duration: (sliderSetWidth / sliderSpeed) * 1000, iterations: Infinity, easing: "linear" }
   );
   sliderAnim.currentTime = (sliderOffset / sliderSpeed) * 1000;
 };
