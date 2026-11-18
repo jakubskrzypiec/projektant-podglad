@@ -2120,3 +2120,50 @@ if (tabelaOferty) {
     obserwator.observe(widok);
   }
 }
+
+/* TYMCZASOWY POMIAR (tylko z ?pomiar=1 w adresie, 18.11): przez 10 s
+   zapisuje czas kazdej klatki przegladarki i kazdy krok karuzeli, potem
+   pokazuje wynik w rogu strony. Rozroznia zaciecia skryptu/strony (dluga
+   klatka) od zaciec samego wyswietlania (klatki rowne, a obraz staje). */
+if (new URLSearchParams(location.search).has("pomiar")) {
+  window.addEventListener("load", () => window.setTimeout(() => {
+    const tasma = document.querySelector("[data-project-track]");
+    if (!tasma) return;
+    const pole = document.createElement("pre");
+    pole.style.cssText = "position:fixed;left:8px;bottom:8px;z-index:99999;margin:0;padding:10px 12px;background:#fff;color:#111;font:12px/1.45 monospace;border:2px solid #283d68;border-radius:8px;white-space:pre-wrap;max-width:min(560px,calc(100vw - 16px))";
+    pole.textContent = "Pomiar trwa 10 s - nie ruszaj myszka ani strona...";
+    document.body.append(pole);
+    const polozenie = () => new DOMMatrixReadOnly(getComputedStyle(tasma).transform).m41;
+    const czasy = [];
+    const kroki = [];
+    let poprzednie = polozenie();
+    const start = performance.now();
+    const klatka = teraz => {
+      czasy.push(teraz);
+      const p = polozenie();
+      if (Math.abs(p - poprzednie) > 1e-4) { kroki.push([czasy.length - 1, teraz]); poprzednie = p; }
+      if (teraz - start < 10000) requestAnimationFrame(klatka);
+      else {
+        const dt = czasy.slice(1).map((t, i) => t - czasy[i]);
+        const sr = [...dt].sort((a, b) => a - b)[dt.length >> 1] || 0;
+        const dlugie = dt.filter(d => d > sr * 1.6);
+        const odstepy = kroki.slice(1).map((k, i) => k[0] - kroki[i][0]);
+        const hist = {};
+        odstepy.forEach(o => { hist[o] = (hist[o] || 0) + 1; });
+        const odstepyMs = kroki.slice(1).map((k, i) => k[1] - kroki[i][1]);
+        const typowy = [...odstepyMs].sort((a, b) => a - b)[odstepyMs.length >> 1] || 0;
+        const spoznione = odstepyMs.filter(o => o > typowy * 1.4);
+        pole.textContent = [
+          "WYNIK POMIARU (zrob zrzut ekranu)",
+          navigator.userAgent.split(") ").pop(),
+          `ekran: ${Math.round(1000 / sr)} Hz, skala ${window.devicePixelRatio}, okno ${innerWidth}x${innerHeight}`,
+          `klatki: ${dt.length}, typowa ${sr.toFixed(1)} ms, dlugie ${dlugie.length}, najdluzsza ${Math.max(...dt).toFixed(1)} ms`,
+          `dlugie klatki (ms): ${dlugie.slice(0, 20).map(d => d.toFixed(0)).join(", ") || "brak"}`,
+          `kroki karuzeli: ${kroki.length}, co ile klatek: ${JSON.stringify(hist)}`,
+          `kroki spoznione: ${spoznione.length} (${spoznione.slice(0, 12).map(o => o.toFixed(0)).join(", ") || "brak"} ms; typowo ${typowy.toFixed(0)} ms)`
+        ].join("\n");
+      }
+    };
+    requestAnimationFrame(klatka);
+  }, 2500));
+}
