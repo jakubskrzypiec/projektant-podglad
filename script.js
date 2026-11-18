@@ -642,7 +642,11 @@ let sliderFinishTimer = 0;
 let sliderMotionId = 0;
 /* 14 px/s — wczesniejsze, spokojne tempo (prosba klientow 18.11,
    po probie z 35 px/s). */
-const sliderSpeed = 14; // px / second
+/* Tymczasowo do porownania na podgladzie: ?tempo=20 (px/s) oraz
+   ?karuzela=plynna (ulamki piksela) / ?karuzela=piksele (pelne piksele). */
+const ustawieniaKaruzeli = new URLSearchParams(location.search);
+const sliderSpeed = Number(ustawieniaKaruzeli.get("tempo")) || 14; // px / second
+const karuzelaPiksele = ustawieniaKaruzeli.get("karuzela") !== "plynna";
 
 const originals = () => [...(track?.querySelectorAll("[data-project-card]:not([data-clone])") || [])];
 const clearClones = () => track?.querySelectorAll("[data-clone]").forEach(clone => clone.remove());
@@ -711,7 +715,7 @@ const startAutoplay = () => {
      Na pelnych pikselach ekranu kazda klatka jest ostra i identyczna,
      a krok to 1 piksel ekranu (na ekranach o wysokiej gestosci pol
      piksela strony), wiec ruch dalej wyglada na ciagly. */
-  const gestosc = window.devicePixelRatio || 1;
+  const gestosc = karuzelaPiksele ? (window.devicePixelRatio || 1) : 1000;
   const kroki = Math.max(1, Math.round(sliderSetWidth * gestosc));
 
   if (firefox) {
@@ -741,7 +745,7 @@ const startAutoplay = () => {
   }
   sliderAnim = track.animate(
     [{ transform: "translate3d(0px,0,0)" }, { transform: `translate3d(${-kroki / gestosc}px,0,0)` }],
-    { duration: (sliderSetWidth / sliderSpeed) * 1000, iterations: Infinity, easing: `steps(${kroki}, end)` }
+    { duration: (sliderSetWidth / sliderSpeed) * 1000, iterations: Infinity, easing: karuzelaPiksele ? `steps(${kroki}, end)` : "linear" }
   );
   sliderAnim.currentTime = (sliderOffset / sliderSpeed) * 1000;
 };
