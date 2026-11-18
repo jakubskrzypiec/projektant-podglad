@@ -640,10 +640,9 @@ let sliderAnimating = false;
 let sliderDesktop = false;
 let sliderFinishTimer = 0;
 let sliderMotionId = 0;
-/* 35 px/s (17.11). Przy 14 px/s ruch o ok. 0,1 px na klatke na zwyklym
-   ekranie dawal migotanie krawedzi zdjec ("shaky") mimo idealnie rownych
-   klatek; przy 35 px/s ruch jest plynny dla oka. */
-const sliderSpeed = 35; // px / second
+/* 14 px/s — wczesniejsze, spokojne tempo (prosba klientow 18.11,
+   po probie z 35 px/s). */
+const sliderSpeed = 14; // px / second
 
 const originals = () => [...(track?.querySelectorAll("[data-project-card]:not([data-clone])") || [])];
 const clearClones = () => track?.querySelectorAll("[data-clone]").forEach(clone => clone.remove());
@@ -697,12 +696,33 @@ const normalizeSlider = () => {
    Cala tasma (z kartami i zdjeciami) przesuwa sie jako jedna warstwa,
    wiec zdjecia nie "plywaja" wzgledem ramek. */
 let sliderAnim = null;
+const firefox = navigator.userAgent.includes("Firefox/");
 
 const startAutoplay = () => {
   if (!sliderDesktop || !track || !sliderSetWidth || !track.animate) return;
   sliderAnim?.cancel();
   normalizeSlider();
   setTrackPosition(sliderOffset);
+  if (firefox) {
+    /* Firefox: tasma (ok. 7000 px szerokosci) jest za szeroka, zeby
+       animacja przegladarki szla w calosci na karcie graficznej — Firefox
+       dorysowuje ja kawalkami i ruch staje, a potem przeskakuje (filmik
+       klientow z 17.11, Chrome i Edge byly w porzadku). Tu tasme przesuwa
+       petla klatek; sama zmiana transform nie wymaga przerysowania. */
+    const odStartu = sliderOffset;
+    const start = performance.now();
+    let klatka = 0;
+    track.style.willChange = "transform";
+    const krok = teraz => {
+      sliderOffset = odStartu + ((teraz - start) / 1000) * sliderSpeed;
+      normalizeSlider();
+      setTrackPosition(sliderOffset);
+      klatka = requestAnimationFrame(krok);
+    };
+    klatka = requestAnimationFrame(krok);
+    sliderAnim = { cancel: () => { cancelAnimationFrame(klatka); track.style.willChange = ""; } };
+    return;
+  }
   sliderAnim = track.animate(
     [{ transform: "translate3d(0px,0,0)" }, { transform: `translate3d(${-sliderSetWidth}px,0,0)` }],
     { duration: (sliderSetWidth / sliderSpeed) * 1000, iterations: Infinity, easing: "linear" }
