@@ -703,20 +703,36 @@ const startAutoplay = () => {
   sliderAnim?.cancel();
   normalizeSlider();
   setTrackPosition(sliderOffset);
+
+  /* Ruch zawsze o pelne piksele ekranu (18.11). Przy 14 px/s tasma
+     przesuwa sie o ok. 0,1-0,2 piksela na klatke; przy ulamkowych
+     polozeniach przegladarka za kazdym razem inaczej rozmywa krawedzie
+     zdjec — w Edge widac to jako migotanie, w Firefoksie jako drganie.
+     Na pelnych pikselach ekranu kazda klatka jest ostra i identyczna,
+     a krok to 1 piksel ekranu (na ekranach o wysokiej gestosci pol
+     piksela strony), wiec ruch dalej wyglada na ciagly. */
+  const gestosc = window.devicePixelRatio || 1;
+  const kroki = Math.max(1, Math.round(sliderSetWidth * gestosc));
+
   if (firefox) {
     /* Firefox: tasma (ok. 7000 px szerokosci) jest za szeroka, zeby
        animacja przegladarki szla w calosci na karcie graficznej — Firefox
        dorysowuje ja kawalkami i ruch staje, a potem przeskakuje (filmik
-       klientow z 17.11, Chrome i Edge byly w porzadku). Tu tasme przesuwa
-       petla klatek; sama zmiana transform nie wymaga przerysowania. */
+       klientow z 17.11). Tu tasme przesuwa petla klatek; sama zmiana
+       transform nie wymaga przerysowania. */
     const odStartu = sliderOffset;
     const start = performance.now();
     let klatka = 0;
+    let ostatni = -1;
     track.style.willChange = "transform";
     const krok = teraz => {
       sliderOffset = odStartu + ((teraz - start) / 1000) * sliderSpeed;
       normalizeSlider();
-      setTrackPosition(sliderOffset);
+      const piksel = Math.round(sliderOffset * gestosc);
+      if (piksel !== ostatni) {
+        ostatni = piksel;
+        setTrackPosition(piksel / gestosc);
+      }
       klatka = requestAnimationFrame(krok);
     };
     klatka = requestAnimationFrame(krok);
@@ -724,8 +740,8 @@ const startAutoplay = () => {
     return;
   }
   sliderAnim = track.animate(
-    [{ transform: "translate3d(0px,0,0)" }, { transform: `translate3d(${-sliderSetWidth}px,0,0)` }],
-    { duration: (sliderSetWidth / sliderSpeed) * 1000, iterations: Infinity, easing: "linear" }
+    [{ transform: "translate3d(0px,0,0)" }, { transform: `translate3d(${-kroki / gestosc}px,0,0)` }],
+    { duration: (sliderSetWidth / sliderSpeed) * 1000, iterations: Infinity, easing: `steps(${kroki}, end)` }
   );
   sliderAnim.currentTime = (sliderOffset / sliderSpeed) * 1000;
 };
