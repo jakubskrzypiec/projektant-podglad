@@ -9957,3 +9957,19 @@ body,
 @keyframes hero-word-fade {
   50% { opacity: 0; }
 }
+
+/* 7) TELEFON — hamburger na podstronach zawsze granatowy (uwaga 24.11).
+   Regula wyzej (.header:not(.is-scrolled) .menu-toggle) robi go bialy na
+   samej gorze strony — to ma sens tylko na stronie glownej, gdzie pasek
+   lezy na zdjeciu. Na podstronach pasek ma jasne tlo, wiec przywracamy
+   ten sam wyglad co po przewinieciu. Strona glowna bez zmian. */
+@media (max-width: 820px) {
+  body:not(.home) .header:not(.is-scrolled) .menu-toggle {
+    border-color: rgba(40,61,104,.3);
+    color: var(--navy);
+  }
+
+  body:not(.home) .header:not(.is-scrolled) .menu-toggle span {
+    background: var(--navy);
+  }
+}

@@ -2077,3 +2077,31 @@ if (tabelaOferty) {
     obserwator.observe(widok);
   }
 }
+
+/* TELEFON — X zamykajacy galerie projektu zawsze w prawym gornym rogu
+   karty (uwaga 24.11). Przycisk lezy na zaciemnionym tle okna, a karta
+   jest wysrodkowana w pionie, wiec jej gorna krawedz zalezy od projektu
+   i wysokosci ekranu — staly odstep od krawedzi ekranu nie trafial w rog.
+   Tu polozenie liczymy od karty: 12 px od jej gornej i prawej krawedzi.
+   Tylko do 820 px szerokosci; na komputerze bez zmian. */
+{
+  const zamknijGalerie = modal?.querySelector(".modal__close");
+  const kartaGalerii = modal?.querySelector(".modal__inner");
+  const ustawZamknij = () => {
+    if (!zamknijGalerie || !kartaGalerii) return;
+    if (window.innerWidth > 820 || !modal.classList.contains("is-open")) {
+      zamknijGalerie.style.removeProperty("top");
+      zamknijGalerie.style.removeProperty("right");
+      return;
+    }
+    const odstep = 12;
+    const prawaKarty = kartaGalerii.offsetLeft + kartaGalerii.offsetWidth;
+    zamknijGalerie.style.setProperty("top", `${kartaGalerii.offsetTop + odstep}px`, "important");
+    zamknijGalerie.style.setProperty("right", `${modal.clientWidth - prawaKarty + odstep}px`, "important");
+  };
+  if (zamknijGalerie && kartaGalerii) {
+    if ("ResizeObserver" in window) new ResizeObserver(ustawZamknij).observe(kartaGalerii);
+    new MutationObserver(ustawZamknij).observe(modal, { attributes: true, attributeFilter: ["class"] });
+    window.addEventListener("resize", ustawZamknij, { passive: true });
+  }
+}
