@@ -640,9 +640,10 @@ let sliderAnimating = false;
 let sliderDesktop = false;
 let sliderFinishTimer = 0;
 let sliderMotionId = 0;
-/* 14 px/s — wczesniejsze, spokojne tempo (prosba klientow 18.11,
-   po probie z 35 px/s). */
-const sliderSpeed = 14; // px / second
+/* 30 px/s z minimalnym obrotem — wybor klientow 24.11 po porownaniu
+   wariantow na stronie testowej (jakubskrzypiec.github.io/karuzela-test).
+   Przy wolniejszym ruchu (14 px/s) Firefox pokazywal drganie. */
+const sliderSpeed = 30; // px / second
 
 const originals = () => [...(track?.querySelectorAll("[data-project-card]:not([data-clone])") || [])];
 const clearClones = () => track?.querySelectorAll("[data-clone]").forEach(clone => clone.remove());
@@ -696,7 +697,6 @@ const normalizeSlider = () => {
    Cala tasma (z kartami i zdjeciami) przesuwa sie jako jedna warstwa,
    wiec zdjecia nie "plywaja" wzgledem ramek. */
 let sliderAnim = null;
-const firefox = navigator.userAgent.includes("Firefox/");
 
 const startAutoplay = () => {
   if (!sliderDesktop || !track || !sliderSetWidth || !track.animate) return;
@@ -704,62 +704,14 @@ const startAutoplay = () => {
   normalizeSlider();
   setTrackPosition(sliderOffset);
 
-  if (firefox) {
-    /* Firefox (pomiary z nagran ekranu, 18.11):
-       - animacja przegladarki calej tasmy (ok. 7000 px) nie idzie w
-         calosci na karcie graficznej — Firefox dorysowuje ja kawalkami
-         (filmik klientow z 17.11: ruch staje i przeskakuje);
-       - przy polozeniach w ulamkach piksela Firefox przyciaga napisy pod
-         zdjeciami do pelnych pikseli w innych chwilach niz zdjecia —
-         podpisy "tykaja", a zdjecia sie przesuwaja, wiec karta drga;
-       - przy pelnych pikselach liczonych z czasu zdjecie i napis jada
-         idealnie razem, ale kroki wypadaja nierowno (co 3, 4 albo 5
-         klatek ekranu) — taki rytm tez wyglada na drganie.
-       Dlatego tutaj: zawsze dokladnie 1 piksel ekranu co stala liczbe
-       klatek ekranu (rowny rytm), dobrana tak, zeby tempo bylo jak
-       najblizsze tempu Firefoksa przy czestotliwosci odswiezania ekranu.
-       Tempo w Firefoksie ok. 20 px/s zamiast 14 (decyzja 18.11): pomiar
-       w Firefoksie Jakuba pokazal idealnie rowne kroki, a "drganie" to
-       samo tykanie o 1 piksel 14 razy na sekunde — czestsze kroki
-       wygladaja plynniej. Pozostale przegladarki zostaja przy 14 px/s. */
-    const tempoFirefox = 20; // px / second
-    const gestosc = window.devicePixelRatio || 1;
-    sliderOffset = Math.round(sliderOffset * gestosc) / gestosc;
-    setTrackPosition(sliderOffset);
-    const coIleKlatek = fps => Math.max(1, Math.round(fps / (tempoFirefox * gestosc)));
-    let co = coIleKlatek(60);
-    const odstepy = [];
-    let poprzednia = 0;
-    let licznik = 0;
-    let klatka = 0;
-    track.style.willChange = "transform";
-    const krok = teraz => {
-      if (poprzednia && odstepy.length < 30) {
-        odstepy.push(teraz - poprzednia);
-        if (odstepy.length === 30) {
-          const srodkowy = [...odstepy].sort((a, b) => a - b)[15];
-          if (srodkowy > 0) co = coIleKlatek(1000 / srodkowy);
-        }
-      }
-      poprzednia = teraz;
-      licznik += 1;
-      if (licznik >= co) {
-        licznik = 0;
-        sliderOffset += 1 / gestosc;
-        normalizeSlider();
-        /* Po zawinieciu petli (szerokosc zestawu nie musi byc pelnym
-           pikselem) z powrotem na siatke pikseli ekranu. */
-        sliderOffset = Math.round(sliderOffset * gestosc) / gestosc;
-        setTrackPosition(sliderOffset);
-      }
-      klatka = requestAnimationFrame(krok);
-    };
-    klatka = requestAnimationFrame(krok);
-    sliderAnim = { cancel: () => { cancelAnimationFrame(klatka); track.style.willChange = ""; } };
-    return;
-  }
+  /* Ta sama animacja we wszystkich przegladarkach (24.11), jak na stronie
+     testowej: rotate(0.001deg) — propozycja klientow dla Firefoksa,
+     niewidoczny (ok. 0,06 px na calej dlugosci tasmy). */
   sliderAnim = track.animate(
-    [{ transform: "translate3d(0px,0,0)" }, { transform: `translate3d(${-sliderSetWidth}px,0,0)` }],
+    [
+      { transform: "translate3d(0px,0,0) rotate(0.001deg)" },
+      { transform: `translate3d(${-sliderSetWidth}px,0,0) rotate(0.001deg)` }
+    ],
     { duration: (sliderSetWidth / sliderSpeed) * 1000, iterations: Infinity, easing: "linear" }
   );
   sliderAnim.currentTime = (sliderOffset / sliderSpeed) * 1000;
