@@ -9736,6 +9736,14 @@ body *:not(.about__copy .rich-copy, .about__copy .rich-copy *) {
   gap: 0 !important;
 }
 
+/* Komputer: ikony staly 1 px nizej niz kolko zgody (zmierzone na obu
+   stronach) — podniesione o 1 px, srodki dokladnie w jednej osi. */
+@media (min-width: 821px) {
+  .contact__page--left .contact__socials {
+    margin-bottom: 1px !important;
+  }
+}
+
 .contact__page--left .contact__socials strong {
   position: absolute !important;
   width: 1px !important;
