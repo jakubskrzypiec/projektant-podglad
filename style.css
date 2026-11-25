@@ -9541,34 +9541,30 @@ body *:not(.about__copy .rich-copy, .about__copy .rich-copy *) {
 /* 1b. O NAS — uwagi Oliwii 16.11.
    - Kolumny tekstu rowne (wczesniej prawa szersza: 46,5 / 53,5).
    - Podpis zdjecia blizej rogu. */
-/* Kolumny O nas: rowna szerokosc I rowna wysokosc. Przy dwoch osobnych
-   blokach (po 2 akapity) rowna szerokosc dawala rozne dlugosci kolumn
-   (zmierzone: 27-83 px roznicy). Teraz cztery akapity plyna przez dwie
-   kolumny jak w gazecie — przegladarka sama wyrownuje ich wysokosc,
-   a orphans/widows: 2 nie zostawia pojedynczej linii na dole ani na
-   gorze kolumny (to byl powod rezygnacji z kolumn 25.09). */
+/* Kolumny O nas wg wzoru klientow z 24.11 ("Wzor.pdf"): dwie kolumny
+   rownej szerokosci, w lewej akapity 1-2, w prawej 3-4, obie od gory.
+   Wysokosci kolumn nie sa wyrownywane (lewa jest dluzsza, jak na wzorze)
+   i zaden akapit nie przechodzi do drugiej kolumny. Odstep miedzy
+   kolumnami i miedzy akapitami bez zmian. */
 @media (min-width: 821px) {
   .about__copy .rich-copy {
-    display: block !important;
-    column-count: 2;
-    column-gap: clamp(28px, 3.2vw, 46px);
-    column-fill: balance;
+    display: grid !important;
+    /* !important: starsza regula wyzej (46,5 / 53,5) tez ma !important. */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    column-gap: clamp(28px, 3.2vw, 46px) !important;
+    align-items: start !important;
   }
 
   .about__copy .rich-copy > div {
-    display: contents !important;
+    display: block !important;
+    min-width: 0;
   }
 
   .about__copy .rich-copy p {
     margin: 0 0 16px !important;
-    /* Starsze reguly mialy break-inside: avoid — akapit nie mogl przejsc
-       do drugiej kolumny i wyrownanie wysokosci nie dzialalo. */
-    break-inside: auto !important;
-    orphans: 2;
-    widows: 2;
   }
 
-  .about__copy .rich-copy > div:last-child > p:last-child {
+  .about__copy .rich-copy > div > p:last-child {
     margin-bottom: 0 !important;
   }
 }
@@ -9689,66 +9685,38 @@ body *:not(.about__copy .rich-copy, .about__copy .rich-copy *) {
   }
 }
 
-/* 2c. Sekcja kontaktu — 4 profile (doszedl TikTok, 17.11).
-   Komputer: wszystkie w jednej linii. Ikona z podpisem obok zajmowala
-   ok. 630 px przy kolumnie 389-528 px, wiec podpis staje pod ikona.
-   Telefon: siatka 2 x 2 (TikTok pod Instagramem, obok LinkedIna). */
-@media (min-width: 821px) {
-  .contact__page--left .contact__socials {
-    display: grid !important;
-    grid-template-columns: repeat(4, max-content);
-    justify-content: start;
-    column-gap: clamp(18px, 2.2vw, 34px) !important;
-    row-gap: 0 !important;
-  }
-
-  .contact__page--left .contact__socials a {
-    flex-direction: column;
-    gap: 8px !important;
-    text-align: center;
-  }
-
-  .contact__page--left .contact__socials strong {
-    font-size: 13px !important;
-  }
+/* 2c. Sekcja kontaktu — ikony profili (Facebook, Instagram, LinkedIn,
+   TikTok). Uwaga klientow 24.11: "wyrownaj do osi, bez opisow".
+   - Same ikony, bez podpisow pod spodem; podpis zostaje dla czytnikow
+     ekranu (ukryty tylko wizualnie), wiec link nadal ma nazwe.
+   - Jeden rzad od lewej krawedzi tekstu kolumny (wczesniej pierwsza ikona
+     stala ok. 15 px dalej, bo byla wysrodkowana nad podpisem).
+   - Bez podpisu dol rzedu ikon to dol kolumny, wiec na komputerze srodek
+     ikon wypada w osi kolka zgody i przycisku "Wyslij zapytanie".
+   To samo na stronie glownej i na podstronie Kontakt. */
+.contact__page--left .contact__socials {
+  display: flex !important;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  column-gap: 14px !important;
+  row-gap: 14px !important;
 }
 
-/* Najwezsze ekrany komputera: kolumna kontaktu ma tylko ok. 290 px. */
-@media (min-width: 821px) and (max-width: 1000px) {
-  .contact__page--left .contact__socials {
-    column-gap: 8px !important;
-  }
-
-  .contact__page--left .contact__socials strong {
-    font-size: 11.5px !important;
-    letter-spacing: .06em !important;
-  }
+.contact__page--left .contact__socials a {
+  display: inline-flex !important;
+  gap: 0 !important;
 }
 
-@media (max-width: 820px) {
-  .contact__page--left .contact__socials {
-    display: grid !important;
-    grid-template-columns: repeat(2, max-content);
-    column-gap: 12px !important;
-    row-gap: 12px !important;
-  }
-}
-
-@media (max-width: 400px) {
-  .contact__page--left .contact__socials a {
-    gap: 8px !important;
-  }
-
-  .contact__page--left .contact__socials strong {
-    font-size: 13px !important;
-  }
-}
-
-/* Bardzo waskie telefony (ponizej 340 px): 2 x 2 sie nie miesci. */
-@media (max-width: 339px) {
-  .contact__page--left .contact__socials {
-    grid-template-columns: 1fr;
-  }
+.contact__page--left .contact__socials strong {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }
 
 /* 2d. Karuzela na komputerze — zdjecia bez osobnych warstw graficznych.
