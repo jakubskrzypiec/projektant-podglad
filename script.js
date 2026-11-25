@@ -2105,3 +2105,50 @@ if (tabelaOferty) {
     window.addEventListener("resize", ustawZamknij, { passive: true });
   }
 }
+
+/* O NAS — linijki jak we wzorze klientow (25.11). Na komputerze kazda
+   linijka ze wzoru to osobny wiersz (span.wiersz, CSS 1b). Tu dobieramy
+   rozmiar czcionki tak, zeby najdluzsza linijka zmiescila sie w kolumnie
+   (bez tego slowa przeskakiwalyby do nastepnego wiersza). Najwyzej 17 px
+   (rozmiar tekstu na stronie); gdyby trzeba bylo zejsc ponizej 13 px
+   (bardzo waskie okno komputera), tekst plynie normalnie (klasa plynny).
+   Na telefonie bez zmian — jedna kolumna, tekst plynie. */
+{
+  const onasTekst = document.querySelector(".about__copy .rich-copy");
+  const onasWiersze = onasTekst ? [...onasTekst.querySelectorAll(".wiersz")] : [];
+  const dopasujONas = () => {
+    if (!onasTekst || !onasWiersze.length) return;
+    onasTekst.style.removeProperty("--onas-fs");
+    onasTekst.classList.remove("plynny");
+    if (window.innerWidth <= 820) return;
+    const akapit = onasTekst.querySelector("p");
+    const styl = getComputedStyle(akapit);
+    const BAZA = 17;
+    const miara = document.createElement("canvas").getContext("2d");
+    miara.font = `${styl.fontWeight} ${BAZA}px ${styl.fontFamily}`;
+    let potrzeba = 0;
+    onasWiersze.forEach(wiersz => {
+      const kolumna = wiersz.closest(".rich-copy > div");
+      const szerokosc = kolumna ? kolumna.clientWidth : 0;
+      if (!szerokosc) return;
+      const tekst = wiersz.textContent.replace(/­/g, "").replace(/s+/g, " ").trim();
+      potrzeba = Math.max(potrzeba, miara.measureText(tekst).width / szerokosc);
+    });
+    if (!potrzeba) return;
+    const rozmiar = Math.min(BAZA, (BAZA / potrzeba) * 0.985);
+    if (rozmiar < 13) {
+      onasTekst.classList.add("plynny");
+      return;
+    }
+    onasTekst.style.setProperty("--onas-fs", `${rozmiar.toFixed(2)}px`);
+  };
+  if (onasWiersze.length) {
+    dopasujONas();
+    (document.fonts?.ready || Promise.resolve()).then(dopasujONas);
+    let czasONas = 0;
+    window.addEventListener("resize", () => {
+      window.clearTimeout(czasONas);
+      czasONas = window.setTimeout(dopasujONas, 120);
+    }, { passive: true });
+  }
+}

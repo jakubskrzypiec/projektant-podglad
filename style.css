@@ -9567,6 +9567,35 @@ body *:not(.about__copy .rich-copy, .about__copy .rich-copy *) {
   .about__copy .rich-copy > div > p:last-child {
     margin-bottom: 0 !important;
   }
+
+  /* Linijki dokladnie jak we wzorze (25.11): kazda linijka ze wzoru to
+     osobny wiersz justowany na cala szerokosc kolumny, ostatnia linijka
+     akapitu do lewej (jak w Wordzie), bez dzielenia wyrazow. Rozmiar
+     czcionki (--onas-fs) ustawia skrypt tak, zeby najdluzsza linijka
+     zmiescila sie w kolumnie. Interlinia i odstep miedzy akapitami
+     z proporcji wzoru. */
+  .about__copy .rich-copy:not(.plynny) p {
+    font-size: var(--onas-fs, 16px) !important;
+    line-height: 1.7 !important;
+    margin-bottom: 1em !important;
+    hyphens: manual !important;
+    -webkit-hyphens: manual !important;
+    text-align: justify !important;
+  }
+
+  .about__copy .rich-copy:not(.plynny) > div > p:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  .about__copy .rich-copy:not(.plynny) .wiersz {
+    display: block;
+    text-align: justify;
+    text-align-last: justify;
+  }
+
+  .about__copy .rich-copy:not(.plynny) .wiersz:last-child {
+    text-align-last: left;
+  }
 }
 
 .about__visual .about__caption {
